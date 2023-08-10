@@ -1,0 +1,10 @@
+debug/main.o
+debug/kostcpserver.o
+debug/session.o
+debug/datamanager.o
+debug/common.o
+debug/satellite.o
+debug/satelliteplanningrule.o
+debug/weatherwidget.o
+debug/moc_datamanager.o
+debug/moc_weatherwidget.o

@@ -1,0 +1,10 @@
+release/main.o
+release/kostcpserver.o
+release/session.o
+release/datamanager.o
+release/common.o
+release/satellite.o
+release/satelliteplanningrule.o
+release/weatherwidget.o
+release/moc_datamanager.o
+release/moc_weatherwidget.o

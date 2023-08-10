@@ -16,10 +16,10 @@ SatellitePlanningPriority getSatellitePlanningPriorityVal(QString satellitePlann
 struct  SatellitePlanningRule
 {
     SatellitePlanningPriority priority = SatellitePlanningPriority(getRandomInt(3));
-    int pointsAmount = getRandomInt(5, 8)*100;
+    int pointsAmount = getRandomInt(1, 5);
     int minSessions = getRandomInt(1, 3);
     int maxSessions = getRandomInt(minSessions, 5);
-    int minSessionInterval = getRandomInt(0, 60);
+    int minSessionInterval = getRandomInt(0, 12) * 5;
 
 public:
     QJsonObject toJson();

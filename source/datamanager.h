@@ -36,6 +36,7 @@ public:
     int getCurManualSessionSatId() { return curManualSessionSatId;}
     bool getCurManualSessionIsRunning() { return manualSessionIsRunning;}
     QString getCurManualSessionInfoText();
+    QPair<int, int> getKosState();
 
     WeatherWidget weatherWidget;
 
@@ -61,8 +62,8 @@ private:
     int curManualSessionPoints = 0;
     int curManualSessionSatId = -1;
     int manualSessionIsRunning = false;
-
-
+    int currentKosState = 4;
+    int errorsCount = 0;
     const static int rows = 20;
     const static int cols = 20;
     bool matrix[rows][cols];
@@ -71,6 +72,9 @@ private:
     int ratio = 1;
     int rain_duration = 0;
     int wind = rand() % 4;
+    int secsToUpdateWeather = 1;
+    int currentSecsToUpdateWeather = 1;
+        int debug = 0;
 };
 
 #endif // DATAMANAGER_H

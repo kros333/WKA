@@ -612,10 +612,9 @@ void KosTcpServer::sendKosState(const QJsonObject &jObj, QTcpSocket* socket)
 {
     QJsonObject jResponse;
     jResponse["type"] = "kosState";
-
-    int state = (QTime::currentTime().second()/10) + 1;
-    jResponse["stateNum"] = state;
-    jResponse["errorsCount"] = state == 3 ? getRandomInt(10) : 0;
+    QPair<int, int> stateAndErrors = dm->getKosState();
+    jResponse["stateNum"] =  stateAndErrors.first;
+    jResponse["errorsCount"] = stateAndErrors.first == 3 ? stateAndErrors.second : 0;
     jResponse["isManualMode"] = dm->getManualMode();
 
     writeBytes(QJsonDocument(jResponse).toJson(QJsonDocument::Compact), socket);

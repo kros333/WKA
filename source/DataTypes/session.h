@@ -5,6 +5,7 @@
 #include "common.h"
 #include "satellite.h"
 #include <QDateTime>
+#include "satelliteplanningrule.h"
 
 /// Сеанс
 struct Session
@@ -22,7 +23,7 @@ struct Session
     QDateTime factSessionTimeEnd;
     CompletionState cState;
     int answers;
-    int numberOfSession; //порядковый номер сессии внутри окна видимости (не может быть более 5)
+    SatellitePlanningRule currentPlanningRule;
 };
 
 #endif // SESSION_H

@@ -4,10 +4,15 @@
 #include <cstdlib>
 #include <ctime>
 #include "weatherwidget.h"
+#include <algorithm>
+#include "math.h"
 
+//qDebug() << debug;
+//debug++;
 
 DataManager::DataManager(quint16 daysToLeft, quint16 daysToRight)
 {
+
 
 
     weatherWidget.show();
@@ -57,167 +62,178 @@ DataManager::DataManager(quint16 daysToLeft, quint16 daysToRight)
     }
 
 
-
-    int sessionsLeftInWindow = 4;
-    bool generatingWindowNow = false;
-    bool generatedSessionOnThisLoop = false;
     VisibilityWindowSummary vis;
     QDateTime crawlDt = historyStartDt;
-    int someLastKaId[7]{-1,-1,-1,-1,-1,-1,-1};
-
-
+//    int LastKaId[40]{-1,-1,-1,-1,-1,-1,-1};
+    QList<QDateTime> LastKaVis;
+    for (int i = 0; i < satellites.length(); i++)
+    {
+        LastKaVis << QDateTime::currentDateTime().addDays(-3000);
+    }
     while (crawlDt < futureStopDt)
     {
-        crawlDt = crawlDt.addSecs(getRandomInt(1, 30)*60);
+        int sessionsLeftInWindow = 0;
+        crawlDt = crawlDt.addSecs(getRandomInt(3, 30)*60);
         int currentKaId;
         bool kaOk = false;
         while(!kaOk)
         {
+            //            if(kaPos >= 30 && getRandomInt(64)) kaPos = getRandomInt(29);
             currentKaId = getRandomInt(satellites.length()-1);
-            kaOk = true;
-            for(int i = 0; i < 7; i++)
+            kaOk = false;
+
+            if(LastKaVis[currentKaId].addSecs(7200) < crawlDt)
             {
-                if(currentKaId == someLastKaId[i])
+                kaOk = true;
+            }
+
+        }
+        SatellitePlanningRule currentSatellitePlanningRule = satellitePlanningSettings.find(satellites[currentKaId]).value();
+//        switch (currentSatellitePlanningSetting.priority)
+//        {
+//        case 0:
+//            break;
+//        default:
+//            break;
+//        }
+
+
+        vis = VisibilityWindowSummary();
+        vis.startEnd.start = crawlDt;
+        vis.startEnd.end = crawlDt.addSecs(getRandomInt(30, 240)*60);
+        LastKaVis[currentKaId] = vis.startEnd.end;
+        //начало окна всегда с солнечной погодой (почему? пока что не так)
+        vis.weathers << VisibilityWindowSummary::WeatherSpan(static_cast<Weather>(getRandomInt(2)), TimeSpan(crawlDt, crawlDt.addSecs(getRandomInt(1, vis.startEnd.end.toSecsSinceEpoch()/60 - vis.startEnd.start.toSecsSinceEpoch()/60)*60)));///////////////////////////////////////////////////
+        while(vis.weathers.last().span.end != vis.startEnd.end)
+        {
+            vis.weathers << VisibilityWindowSummary::WeatherSpan(static_cast<Weather>(getRandomInt(2)), TimeSpan(vis.weathers.last().span.end, vis.weathers.last().span.end.addSecs(getRandomInt(1, vis.startEnd.end.toSecsSinceEpoch()/60 - vis.startEnd.start.toSecsSinceEpoch()/60)*60)));///////////////////////////////////////////////////
+            if(vis.weathers.last().span.end > vis.startEnd.end)
+            {
+                vis.weathers.last().span.end = vis.startEnd.end;
+            }
+        }
+
+        // определяем количество сессий в окне
+        for (int i = currentSatellitePlanningRule.maxSessions; i >= currentSatellitePlanningRule.minSessions && sessionsLeftInWindow == 0; i--)
+        {
+            if(i * currentSatellitePlanningRule.pointsAmount * 180 + (i - 1) * currentSatellitePlanningRule.minSessionInterval * 60 <= vis.startEnd.end.toSecsSinceEpoch() - vis.startEnd.start.toSecsSinceEpoch())
+            {
+                sessionsLeftInWindow = i;
+                if(sessionsLeftInWindow - 1 > 0)
                 {
-                    kaOk = false;
+                    currentSatellitePlanningRule.minSessionInterval = floor((vis.startEnd.end.toSecsSinceEpoch() - vis.startEnd.start.toSecsSinceEpoch() - (sessionsLeftInWindow * currentSatellitePlanningRule.pointsAmount * 180))/((sessionsLeftInWindow - 1) * 60));
                 }
             }
         }
-        switch (satellitePlanningSettings.find(satellites[currentKaId]).value().priority)
+        if(sessionsLeftInWindow == 0)
         {
-        case 0:
-            break;
-        default:
-            break;
+            for (int i = currentSatellitePlanningRule.minSessionInterval; i >= 0 && sessionsLeftInWindow == 0; i--)
+            {
+                if(currentSatellitePlanningRule.minSessions * currentSatellitePlanningRule.pointsAmount * 180 + (currentSatellitePlanningRule.minSessions - 1) * i * 60 <= vis.startEnd.end.toSecsSinceEpoch() - vis.startEnd.start.toSecsSinceEpoch())
+                {
+                    sessionsLeftInWindow = currentSatellitePlanningRule.minSessions;
+                    currentSatellitePlanningRule.minSessionInterval = i;
+                }
+            }
+            if(sessionsLeftInWindow == 0)
+            {
+                for (int i = currentSatellitePlanningRule.minSessions; i >= 1 && sessionsLeftInWindow == 0; i--)
+                {
+                    if(currentSatellitePlanningRule.pointsAmount * i * 180 <= vis.startEnd.end.toSecsSinceEpoch() - vis.startEnd.start.toSecsSinceEpoch())
+                    {
+                        sessionsLeftInWindow = i;
+                        currentSatellitePlanningRule.minSessionInterval = 0;
+                    }
+                }
+            }
         }
+        QDateTime startCurSession = vis.startEnd.start;
+        while(sessionsLeftInWindow > 0)
+        {
+            Session s;
+            s.currentPlanningRule = currentSatellitePlanningRule;
+            s.id = ++globalSessionLastUsedId;
+            s.ka = satellites.at(currentKaId);
+            s.factSessionTimeStart = startCurSession;
+            s.factSessionTimeEnd = startCurSession.addSecs(s.currentPlanningRule.pointsAmount * 180);
+            s.visibilityStart = vis.startEnd.start;
+            s.visibilityEnd = vis.startEnd.end;
+            s.cState = static_cast<CompletionState>(getRandomInt(6));
+            if(s.cState == InProgress || s.cState == PlannedFixed || s.cState == PlannedRange) s.cState = Done;
 
+            if(s.factSessionTimeStart > QDateTime::currentDateTime()) s.cState = getRandomInt(1) ? PlannedFixed : PlannedRange;
+
+//            if(globalCurrentSessionArrayPos == 0 && QDateTime::currentDateTime() <= s.factSessionTimeStart)
+//                globalCurrentSessionArrayPos = sessions.count();
+
+
+            switch (s.cState)
+            {
+            case 3:
+                s.answers = s.currentPlanningRule.pointsAmount * 180 + getRandomInt(0,9);
+                break;
+            case 4:
+            case 5:
+            case 6:
+                if(getRandomInt(0,1))
+                {
+                    s.answers = getRandomInt(s.currentPlanningRule.pointsAmount * 180 - 10);
+                }
+                else
+                {
+                    s.answers = 0;
+                }
+                break;
+            default:
+                break;
+            }
+            startCurSession = startCurSession.addSecs(s.currentPlanningRule.pointsAmount * 180 + s.currentPlanningRule.minSessionInterval * 60);
+            sessions << s;
+            vis.sessions << qMakePair(TimeSpan(s.factSessionTimeStart, s.factSessionTimeEnd), s.cState);
+            sessionsLeftInWindow--;
+        }
+        windows << qMakePair(currentKaId, vis);
+
+
+//        // генерация окна
+//        // подготовка данных
+//        //если в данный момент не генерируем окно и по кубику надо начать генерировать
 
 //        vis = VisibilityWindowSummary();
 //        vis.startEnd.start = crawlDt;
-//        vis.startEnd.end = crawlDt.addSecs(getRandomInt(30, 240)*60);
-//        //начало окна всегда с солнечной погодой (почему? пока что не так)
-//        vis.weathers << VisibilityWindowSummary::WeatherSpan(static_cast<Weather>(getRandomInt(2)), TimeSpan(crawlDt, crawlDt.addSecs(getRandomInt(1, vis.startEnd.end.toSecsSinceEpoch()/60 - vis.startEnd.start.toSecsSinceEpoch()/60)*60)));///////////////////////////////////////////////////
-//        while(vis.weathers.end()->span.end != vis.startEnd.end)
-//        {
-//            vis.weathers << VisibilityWindowSummary::WeatherSpan(static_cast<Weather>(getRandomInt(2)), TimeSpan(vis.weathers.end()->span.end, vis.weathers.end()->span.end.addSecs(getRandomInt(1, vis.startEnd.end.toSecsSinceEpoch()/60 - vis.startEnd.start.toSecsSinceEpoch()/60)*60)));///////////////////////////////////////////////////
-//            if(vis.weathers.end()->span.end > vis.startEnd.end)
-//            {
-//                vis.weathers.end()->span.end = vis.startEnd.end;
-//            }
-//        }
-//        // 3-5 сессий
-//        if((vis.startEnd.end.toSecsSinceEpoch() - vis.startEnd.start.toSecsSinceEpoch())/60 < 240)
-//        {
-//            sessionsLeftInWindow = 5;
-//        }
-//        if((vis.startEnd.end.toSecsSinceEpoch() - vis.startEnd.start.toSecsSinceEpoch())/60 < 120)
-//        {
-//            sessionsLeftInWindow = 4;
-//        }
-//        if((vis.startEnd.end.toSecsSinceEpoch() - vis.startEnd.start.toSecsSinceEpoch())/60 < 60)
-//        {
-//            sessionsLeftInWindow = 3;
-//        }
-//        while(sessionsLeftInWindow != 0)
-//        {
+//        //начало окна всегда с солнечной погодой
+//        vis.weathers << VisibilityWindowSummary::WeatherSpan(static_cast<Weather>(getRandomInt(2)), TimeSpan(crawlDt, crawlDt));///////////////////////////////////////////////////
+//        // 3 сессии
+//        sessionsLeftInWindow = 3;
 
+//        //обновляем правую границу текущей погоды
+//        if(vis.weathers.length() > 0) vis.weathers.last().span.end = crawlDt;
+
+//        //если кубик сказад что надо менять погоду
+//        if(!getRandomInt(15))
+//        {
+//            auto newWeather = static_cast<Weather>(getRandomInt(2));
+//            if(newWeather != vis.weathers.last().weather)
+//                vis.weathers << VisibilityWindowSummary::WeatherSpan(newWeather, TimeSpan(crawlDt, crawlDt));
 //        }
 
-        Session s;
-        s.id = ++globalSessionLastUsedId;
+//        //если еще надо сессий и кубик скозал
+//        if(sessionsLeftInWindow > 0 && !getRandomInt(9))
+//        {
+//            auto cs = static_cast<CompletionState>(getRandomInt(6));
+//            //if(cs == InProgress) cs = Done;
+//            if(crawlDt > QDateTime::currentDateTime()) cs = getRandomInt(1) ? PlannedFixed : PlannedRange;
+//            vis.sessions << qMakePair(TimeSpan(crawlDt, crawlDt.addSecs(180)), cs);
+//            sessionsLeftInWindow--;
+//        }
+//        // определение конца окна
+//        if(sessionsLeftInWindow == 0 && !getRandomInt(6))
+//        {
+//            vis.startEnd.end = crawlDt;
+//            if(vis.weathers[0].span.start == vis.weathers[0].span.end) vis.weathers.removeAt(0);
+//            if(vis.weathers[vis.weathers.length()-1].span.start == vis.weathers[vis.weathers.length()-1].span.end) vis.weathers.removeAt(vis.weathers.length()-1);
 
-        int kaPos = getRandomInt(satellites.length()-1);
-        //if(kaPos >= 30) kaPos -= getRandomInt(kaPos - 1);
-        if(kaPos >= 30 && getRandomInt(64)) kaPos = getRandomInt(29);
-        s.ka = satellites.at(kaPos);
-
-        s.factSessionTimeStart = crawlDt;
-        s.factSessionTimeEnd = crawlDt.addSecs(180);
-        s.visibilityStart = s.factSessionTimeStart.addSecs(-3600);
-        s.visibilityEnd = s.factSessionTimeStart.addSecs(3600);
-
-
-
-        s.cState = static_cast<CompletionState>(getRandomInt(6));
-        if(s.cState == InProgress || s.cState == PlannedFixed || s.cState == PlannedRange) s.cState = Done;
-
-        if(s.factSessionTimeStart > QDateTime::currentDateTime()) s.cState = getRandomInt(1) ? PlannedFixed : PlannedRange;
-
-        if(globalCurrentSessionArrayPos == 0 && QDateTime::currentDateTime() <= s.factSessionTimeStart)
-            globalCurrentSessionArrayPos = sessions.count();
-
-        switch (s.cState)
-        {
-        case 3:
-            s.answers = satellitePlanningSettings.find(satellites[s.ka->id]).value().pointsAmount + getRandomInt(0,9);
-            break;
-        case 4:
-        case 5:
-        case 6:
-            if(getRandomInt(0,1))
-            {
-                s.answers = getRandomInt(satellitePlanningSettings.find(satellites[s.ka->id]).value().pointsAmount - 10);
-            }
-            else
-            {
-                s.answers = 0;
-            }
-            break;
-        default:
-            break;
-        }
-
-        sessions << s;
-
-        // генерация окна
-        // подготовка данных
-        generatedSessionOnThisLoop = false; //
-        //если в данный момент не генерируем окно и по кубику надо начать генерировать
-        if(!generatingWindowNow && !getRandomInt(6))
-        {
-            generatingWindowNow = true;
-            vis = VisibilityWindowSummary();
-            vis.startEnd.start = crawlDt;
-            //начало окна всегда с солнечной погодой
-            vis.weathers << VisibilityWindowSummary::WeatherSpan(static_cast<Weather>(getRandomInt(2)), TimeSpan(crawlDt, crawlDt));///////////////////////////////////////////////////
-            // 3 сессии
-            sessionsLeftInWindow = 3;
-        }
-
-        //если так и не генерируем
-        if(!generatingWindowNow) continue;
-
-        //обновляем правую границу текущей погоды
-        if(vis.weathers.length() > 0) vis.weathers.last().span.end = crawlDt;
-
-        //если кубик сказад что надо менять погоду
-        if(!getRandomInt(15))
-        {
-            auto newWeather = static_cast<Weather>(getRandomInt(2));
-            if(newWeather != vis.weathers.last().weather)
-                vis.weathers << VisibilityWindowSummary::WeatherSpan(newWeather, TimeSpan(crawlDt, crawlDt));
-        }
-
-        //если еще надо сессий и кубик скозал
-        if(sessionsLeftInWindow > 0 && !getRandomInt(9))
-        {
-            auto cs = static_cast<CompletionState>(getRandomInt(6));
-            //if(cs == InProgress) cs = Done;
-            if(crawlDt > QDateTime::currentDateTime()) cs = getRandomInt(1) ? PlannedFixed : PlannedRange;
-            vis.sessions << qMakePair(TimeSpan(crawlDt, crawlDt.addSecs(180)), cs);
-            sessionsLeftInWindow--;
-            generatedSessionOnThisLoop = true;
-        }
-        // определение конца окна
-        if(sessionsLeftInWindow == 0 && !getRandomInt(6) && !generatedSessionOnThisLoop)
-        {
-            vis.startEnd.end = crawlDt;
-            generatingWindowNow = false;
-            if(vis.weathers[0].span.start == vis.weathers[0].span.end) vis.weathers.removeAt(0);
-            if(vis.weathers[vis.weathers.length()-1].span.start == vis.weathers[vis.weathers.length()-1].span.end) vis.weathers.removeAt(vis.weathers.length()-1);
-
-            windows << qMakePair(currentKaId, vis);
-        }
+//        }
 
 
         //ТЕХ СОСТ + МЕТЕО
@@ -232,11 +248,28 @@ DataManager::DataManager(quint16 daysToLeft, quint16 daysToRight)
 
 
     }
+    std::sort(sessions.begin(), sessions.end(), [](const Session& s1, const Session& s2)
+    {
+        return s1.factSessionTimeStart < s2.factSessionTimeStart;
+    });
 
+    while(sessions[globalCurrentSessionArrayPos].cState > 1 && globalCurrentSessionArrayPos < sessions.length())
+    {
+        globalCurrentSessionArrayPos++;
+    }
+    globalCurrentSessionArrayPos--;
+    if(sessions[globalCurrentSessionArrayPos].factSessionTimeEnd > QDateTime::currentDateTime().addSecs(60))
+    {
+        qDebug() << "InProgress";
+        sessions[globalCurrentSessionArrayPos].cState = InProgress;
+        sessions[globalCurrentSessionArrayPos].answers = getRandomInt(0, 140);
+        qDebug() << sessions[globalCurrentSessionArrayPos].answers;
+    }
+    else
+    {
 
-
-    if(globalCurrentSessionArrayPos > 0) globalCurrentSessionArrayPos--; //unfortunate hack to get current session
-    sessions[globalCurrentSessionArrayPos].cState = InProgress;
+    }
+//    if(globalCurrentSessionArrayPos > 0) globalCurrentSessionArrayPos--; //unfortunate hack to get current session
     qDebug() << "Current session starts at " << sessions[globalCurrentSessionArrayPos].factSessionTimeStart << ", id = " << sessions[globalCurrentSessionArrayPos].id;
 
     auto curDt = QDateTime::currentDateTime();
@@ -332,7 +365,6 @@ const QVector<Session> DataManager::getSessions(QDateTime targetTime, int limitB
 
     //return -1; // if no such index is found
     return filteredSessions.mid(globalCurrentSessionArrayPos-limitBack, limitBack + limitForward + 1); //+1 for current
-
 }
 
 QMap<QDate /*day*/, CompletedSessionsBySatId> DataManager::getSessionsGrid(QDate targetDate, int limitBackInDays, int limitForwardInDays)
@@ -469,12 +501,14 @@ QMap<int /*satId*/, QList<VisibilityWindowSummary>>DataManager::getSessionsRibbo
 
 bool DataManager::updateSatellitePlanningRule(int satId, QString newPriority, int newPointsAmount, int newMinSessions, int newMaxSessions, int newMinSessionInterval)
 {
-    if(satId == -1 ||
+    if(satId < 0 ||
             newPriority == "" ||
-            newPointsAmount == 1 ||
-            newMinSessions == -1 ||
-            newMaxSessions == -1 ||
-            newMinSessionInterval == -1)
+            newPointsAmount <= 0 ||
+            newMinSessions <= 0 ||
+            newMaxSessions <= 0 ||
+            newMinSessionInterval < 0 ||
+            newMinSessions > newMaxSessions ||
+            newPointsAmount > 10)
         return false;
 
     bool ok;
@@ -764,392 +798,403 @@ void DataManager::oneHzTimerElapsed()
     weatherWidget.updateText(sky);
 
 
-
     //обновляем погоду
-    for (int i = 0; i < rows; i++)
+    if(secsToUpdateWeather == currentSecsToUpdateWeather)
     {
-        for (int j = 0; j < cols; j++)
+        for (int i = 0; i < rows; i++)
         {
-            //если нет дождя
-            if (rain_duration == 0)
+            for (int j = 0; j < cols; j++)
             {
-                //если ячейка облачная
-                if (matrix[i][j] == true)
-                {
-                    //если вокруг только облачные ячейки
-                    if (matrix[i - 1][j] == true && matrix[i + 1][j] == true && matrix[i][j - 1] == true && matrix[i][j + 1] == true)
-                    {
-                        //шанс 1 к 200, что станет чистой
-                        int randomNum = rand() % (200 / ratio);
-                        new_matrix[i][j] = (randomNum != 1);
-                    }
-                    else
-                    {
-                        //если рядом хоть одна облачная ячейка или эта ячейка с краю
-                        if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true || i == rows - 1 || i == 0 || j == cols - 1 || j == 0)
-                        {
-                            //проверяем ветер
-                            switch (wind)
-                            {
-                            case 0:
-                                if (matrix[i - 1][j] == true)
-                                {
-                                    //шанс 1 к 200, что станет ясной
-                                    int randomNum = rand() % (200 / ratio);
-                                    new_matrix[i][j] = (randomNum != 1);
-                                }
-                                else
-                                {
-                                    //если эта ячейка с краю, откуда дует ветер
-                                    if (i == 0)
-                                    {
-                                        //шанс 3 к 10, что станет облачной
-                                        int randomNum = rand() % (10 + ratio);
-                                        new_matrix[i][j] = (3 - randomNum > 0);
-                                        if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
-                                        {
-                                            //шанс 99 к 100, что станет облачной
-                                            int randomNum = rand() % (100 + ratio * 10);
-                                            new_matrix[i][j] = (98 - randomNum > 0);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        //шанс 1 к 5, что станет ясной
-                                        int randomNum = rand() % 5;
-                                        new_matrix[i][j] = (randomNum != 1);
-                                    }
-                                }
-                                break;
-                            case 1:
-                                if (matrix[i][j + 1] == true)
-                                {
-                                    //шанс 1 к 200, что станет ясной
-                                    int randomNum = rand() % (200 / ratio);
-                                    new_matrix[i][j] = (randomNum != 1);
-                                }
-                                else
-                                {
-                                    //если эта ячейка с краю, откуда дует ветер
-                                    if (j == cols - 1)
-                                    {
-                                        //шанс 3 к 10, что станет облачной
-                                        int randomNum = rand() % (10 + ratio);
-                                        new_matrix[i][j] = (3 - randomNum > 0);
-                                        if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
-                                        {
-                                            //шанс 99 к 100, что станет облачной
-                                            int randomNum = rand() % (100 + ratio * 10);
-                                            new_matrix[i][j] = (98 - randomNum > 0);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        //шанс 1 к 5, что станет ясной
-                                        int randomNum = rand() % 5;
-                                        new_matrix[i][j] = (randomNum != 1);
-                                    }
-                                }
-                                break;
-                            case 2:
-                                if (matrix[i + 1][j] == true)
-                                {
-                                    //шанс 1 к 200, что станет ясной
-                                    int randomNum = rand() % (200 / ratio);
-                                    new_matrix[i][j] = (randomNum != 1);
-                                }
-                                else
-                                {
-                                    //если эта ячейка с краю, откуда дует ветер
-                                    if (i == rows - 1)
-                                    {
-                                        //шанс 3 к 10, что станет облачной
-                                        int randomNum = rand() % (10 + ratio);
-                                        new_matrix[i][j] = (3 - randomNum > 0);
-                                        if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
-                                        {
-                                            //шанс 99 к 100, что станет облачной
-                                            int randomNum = rand() % (100 + ratio * 10);
-                                            new_matrix[i][j] = (98 - randomNum > 0);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        //шанс 1 к 5, что станет ясной
-                                        int randomNum = rand() % 5;
-                                        new_matrix[i][j] = (randomNum != 1);
-                                    }
-                                }
-                                break;
-                            case 3:
-                                if (matrix[i][j - 1] == true)
-                                {
-                                    //шанс 1 к 200, что станет ясной
-                                    int randomNum = rand() % (200 / ratio);
-                                    new_matrix[i][j] = (randomNum != 1);
-                                }
-                                else
-                                {
-                                    //если эта ячейка с краю, откуда дует ветер
-                                    if (j == 0)
-                                    {
-                                        //шанс 3 к 10, что станет облачной
-                                        int randomNum = rand() % (10 + ratio);
-                                        new_matrix[i][j] = (3 - randomNum > 0);
-                                        if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
-                                        {
-                                            //шанс 99 к 100, что станет облачной
-                                            int randomNum = rand() % (100 + ratio * 10);
-                                            new_matrix[i][j] = (98 - randomNum > 0);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        //шанс 1 к 5, что станет ясной
-                                        int randomNum = rand() % 5;
-                                        new_matrix[i][j] = (randomNum != 1);
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                        //если вокруг нет облачных ячеек
-                        else
-                        {
-                            //шанс 1 к 300, что станет чистой
-                            int randomNum = rand() % 300;
-                            new_matrix[i][j] = (randomNum != 1);
-                        }
-                    }
-                }
-                //если ячейка чистая
-                else
-                {
-                    //если вокруг только облачные ячейки
-                    if (matrix[i - 1][j] == true && matrix[i + 1][j] == true && matrix[i][j - 1] == true && matrix[i][j + 1] == true)
-                    {
-                        //шанс 99 к 100, что станет облачной
-                        int randomNum = rand() % 100;
-                        new_matrix[i][j] = (98 - randomNum > 0);
-                    }
-                    else
-                    {
-                        //если рядом хоть одна облачная ячейка или эта ячейка с краю
-                        if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true || i == rows - 1 || i == 0 || j == cols - 1 || j == 0)
-                        {
-                            //проверяем ветер
-                            switch (wind)
-                            {
-                            case 0:
-                                if (matrix[i - 1][j] == true)
-                                {
-                                    //шанс 1 к 5, что станет облачной
-                                    int randomNum = rand() % 5;
-                                    new_matrix[i][j] = (randomNum == 1);
-                                }
-                                else
-                                {
-                                    //шанс 1 к 300, что станет облачной
-                                    int randomNum = rand() % 300;
-                                    new_matrix[i][j] = (randomNum == 1);
-                                    //если эта ячейка с краю, откуда дует ветер
-                                    if (i == 0)
-                                    {
-                                        //шанс 80 к 100, что станет облачной
-                                        int randomNum = rand() % 100;
-                                        new_matrix[i][j] = (79 - randomNum > 0);
-                                        if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
-                                        {
-                                            //шанс 95 к 100, что станет облачной
-                                            int randomNum = rand() % 100;
-                                            new_matrix[i][j] = (94 - randomNum > 0);
-                                        }
-
-                                    }
-
-                                }
-                                break;
-                            case 1:
-                                if (matrix[i][j + 1] == true)
-                                {
-                                    //шанс 1 к 5, что станет облачной
-                                    int randomNum = rand() % 5;
-                                    new_matrix[i][j] = (randomNum == 1);
-                                }
-                                else
-                                {
-                                    //если эта ячейка с краю, откуда дует ветер
-                                    if (j == cols - 1)
-                                    {
-                                        //шанс 80 к 100, что станет облачной
-                                        int randomNum = rand() % 100;
-                                        new_matrix[i][j] = (79 - randomNum > 0);
-                                        if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
-                                        {
-                                            //шанс 95 к 100, что станет облачной
-                                            int randomNum = rand() % 100;
-                                            new_matrix[i][j] = (94 - randomNum > 0);
-                                        }
-
-                                    }
-                                }
-                                break;
-                            case 2:
-                                if (matrix[i + 1][j] == true)
-                                {
-                                    //шанс 1 к 5, что станет облачной
-                                    int randomNum = rand() % 5;
-                                    new_matrix[i][j] = (randomNum == 1);
-                                }
-                                else
-                                {
-                                    //шанс 1 к 300, что станет облачной
-                                    int randomNum = rand() % 300;
-                                    new_matrix[i][j] = (randomNum == 1);
-                                    //если эта ячейка с краю, откуда дует ветер
-                                    if (i == rows - 1)
-                                    {
-                                        //шанс 80 к 100, что станет облачной
-                                        int randomNum = rand() % 100;
-                                        new_matrix[i][j] = (79 - randomNum > 0);
-                                        if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
-                                        {
-                                            //шанс 95 к 100, что станет облачной
-                                            int randomNum = rand() % 100;
-                                            new_matrix[i][j] = (94 - randomNum > 0);
-                                        }
-
-                                    }
-                                }
-                                break;
-                            case 3:
-                                if (matrix[i][j - 1] == true)
-                                {
-                                    //шанс 1 к 5, что станет облачной
-                                    int randomNum = rand() % 5;
-                                    new_matrix[i][j] = (randomNum == 1);
-                                }
-                                else
-                                {
-                                    //шанс 1 к 300, что станет облачной
-                                    int randomNum = rand() % 300;
-                                    new_matrix[i][j] = (randomNum == 1);
-                                    //если эта ячейка с краю, откуда дует ветер
-                                    if (j == 0)
-                                    {
-                                        //шанс 80 к 100, что станет облачной
-                                        int randomNum = rand() % 100;
-                                        new_matrix[i][j] = (79 - randomNum > 0);
-                                        if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
-                                        {
-                                            //шанс 95 к 100, что станет облачной
-                                            int randomNum = rand() % 100;
-                                            new_matrix[i][j] = (94 - randomNum > 0);
-                                        }
-
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                        //если вокруг нет облачных ячеек
-                        else
-                        {
-                            //шанс 1 к 200, что станет облачной
-                            int randomNum = rand() % 200;
-                            new_matrix[i][j] = (randomNum == 1);
-                        }
-                    }
-                }
-            }
-            //если идет дождь
-            else
-            {
-                new_matrix[i][j] = true;
-                rain_duration--;
-                //если дождь закончился, уменьшаем спавн облаков
+                //если нет дождя
                 if (rain_duration == 0)
                 {
-                    ratio = 40;
+                    //если ячейка облачная
+                    if (matrix[i][j] == true)
+                    {
+                        //если вокруг только облачные ячейки
+                        if (matrix[i - 1][j] == true && matrix[i + 1][j] == true && matrix[i][j - 1] == true && matrix[i][j + 1] == true)
+                        {
+                            //шанс 1 к 200, что станет чистой
+                            int randomNum = rand() % (200 / ratio);
+                            new_matrix[i][j] = (randomNum != 1);
+                        }
+                        else
+                        {
+                            //если рядом хоть одна облачная ячейка или эта ячейка с краю
+                            if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true || i == rows - 1 || i == 0 || j == cols - 1 || j == 0)
+                            {
+                                //проверяем ветер
+                                switch (wind)
+                                {
+                                case 0:
+                                    if (matrix[i - 1][j] == true)
+                                    {
+                                        //шанс 1 к 200, что станет ясной
+                                        int randomNum = rand() % (200 / ratio);
+                                        new_matrix[i][j] = (randomNum != 1);
+                                    }
+                                    else
+                                    {
+                                        //если эта ячейка с краю, откуда дует ветер
+                                        if (i == 0)
+                                        {
+                                            //шанс 3 к 10, что станет облачной
+                                            int randomNum = rand() % (10 + ratio);
+                                            new_matrix[i][j] = (3 - randomNum > 0);
+                                            if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
+                                            {
+                                                //шанс 99 к 100, что станет облачной
+                                                int randomNum = rand() % (100 + ratio * 10);
+                                                new_matrix[i][j] = (98 - randomNum > 0);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            //шанс 1 к 5, что станет ясной
+                                            int randomNum = rand() % 5;
+                                            new_matrix[i][j] = (randomNum != 1);
+                                        }
+                                    }
+                                    break;
+                                case 1:
+                                    if (matrix[i][j + 1] == true)
+                                    {
+                                        //шанс 1 к 200, что станет ясной
+                                        int randomNum = rand() % (200 / ratio);
+                                        new_matrix[i][j] = (randomNum != 1);
+                                    }
+                                    else
+                                    {
+                                        //если эта ячейка с краю, откуда дует ветер
+                                        if (j == cols - 1)
+                                        {
+                                            //шанс 3 к 10, что станет облачной
+                                            int randomNum = rand() % (10 + ratio);
+                                            new_matrix[i][j] = (3 - randomNum > 0);
+                                            if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
+                                            {
+                                                //шанс 99 к 100, что станет облачной
+                                                int randomNum = rand() % (100 + ratio * 10);
+                                                new_matrix[i][j] = (98 - randomNum > 0);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            //шанс 1 к 5, что станет ясной
+                                            int randomNum = rand() % 5;
+                                            new_matrix[i][j] = (randomNum != 1);
+                                        }
+                                    }
+                                    break;
+                                case 2:
+                                    if (matrix[i + 1][j] == true)
+                                    {
+                                        //шанс 1 к 200, что станет ясной
+                                        int randomNum = rand() % (200 / ratio);
+                                        new_matrix[i][j] = (randomNum != 1);
+                                    }
+                                    else
+                                    {
+                                        //если эта ячейка с краю, откуда дует ветер
+                                        if (i == rows - 1)
+                                        {
+                                            //шанс 3 к 10, что станет облачной
+                                            int randomNum = rand() % (10 + ratio);
+                                            new_matrix[i][j] = (3 - randomNum > 0);
+                                            if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
+                                            {
+                                                //шанс 99 к 100, что станет облачной
+                                                int randomNum = rand() % (100 + ratio * 10);
+                                                new_matrix[i][j] = (98 - randomNum > 0);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            //шанс 1 к 5, что станет ясной
+                                            int randomNum = rand() % 5;
+                                            new_matrix[i][j] = (randomNum != 1);
+                                        }
+                                    }
+                                    break;
+                                case 3:
+                                    if (matrix[i][j - 1] == true)
+                                    {
+                                        //шанс 1 к 200, что станет ясной
+                                        int randomNum = rand() % (200 / ratio);
+                                        new_matrix[i][j] = (randomNum != 1);
+                                    }
+                                    else
+                                    {
+                                        //если эта ячейка с краю, откуда дует ветер
+                                        if (j == 0)
+                                        {
+                                            //шанс 3 к 10, что станет облачной
+                                            int randomNum = rand() % (10 + ratio);
+                                            new_matrix[i][j] = (3 - randomNum > 0);
+                                            if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
+                                            {
+                                                //шанс 99 к 100, что станет облачной
+                                                int randomNum = rand() % (100 + ratio * 10);
+                                                new_matrix[i][j] = (98 - randomNum > 0);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            //шанс 1 к 5, что станет ясной
+                                            int randomNum = rand() % 5;
+                                            new_matrix[i][j] = (randomNum != 1);
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                            //если вокруг нет облачных ячеек
+                            else
+                            {
+                                //шанс 1 к 300, что станет чистой
+                                int randomNum = rand() % 300;
+                                new_matrix[i][j] = (randomNum != 1);
+                            }
+                        }
+                    }
+                    //если ячейка чистая
+                    else
+                    {
+                        //если вокруг только облачные ячейки
+                        if (matrix[i - 1][j] == true && matrix[i + 1][j] == true && matrix[i][j - 1] == true && matrix[i][j + 1] == true)
+                        {
+                            //шанс 99 к 100, что станет облачной
+                            int randomNum = rand() % 100;
+                            new_matrix[i][j] = (98 - randomNum > 0);
+                        }
+                        else
+                        {
+                            //если рядом хоть одна облачная ячейка или эта ячейка с краю
+                            if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true || i == rows - 1 || i == 0 || j == cols - 1 || j == 0)
+                            {
+                                //проверяем ветер
+                                switch (wind)
+                                {
+                                case 0:
+                                    if (matrix[i - 1][j] == true)
+                                    {
+                                        //шанс 1 к 5, что станет облачной
+                                        int randomNum = rand() % 5;
+                                        new_matrix[i][j] = (randomNum == 1);
+                                    }
+                                    else
+                                    {
+                                        //шанс 1 к 300, что станет облачной
+                                        int randomNum = rand() % 300;
+                                        new_matrix[i][j] = (randomNum == 1);
+                                        //если эта ячейка с краю, откуда дует ветер
+                                        if (i == 0)
+                                        {
+                                            //шанс 80 к 100, что станет облачной
+                                            int randomNum = rand() % 100;
+                                            new_matrix[i][j] = (79 - randomNum > 0);
+                                            if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
+                                            {
+                                                //шанс 95 к 100, что станет облачной
+                                                int randomNum = rand() % 100;
+                                                new_matrix[i][j] = (94 - randomNum > 0);
+                                            }
+
+                                        }
+
+                                    }
+                                    break;
+                                case 1:
+                                    if (matrix[i][j + 1] == true)
+                                    {
+                                        //шанс 1 к 5, что станет облачной
+                                        int randomNum = rand() % 5;
+                                        new_matrix[i][j] = (randomNum == 1);
+                                    }
+                                    else
+                                    {
+                                        //если эта ячейка с краю, откуда дует ветер
+                                        if (j == cols - 1)
+                                        {
+                                            //шанс 80 к 100, что станет облачной
+                                            int randomNum = rand() % 100;
+                                            new_matrix[i][j] = (79 - randomNum > 0);
+                                            if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
+                                            {
+                                                //шанс 95 к 100, что станет облачной
+                                                int randomNum = rand() % 100;
+                                                new_matrix[i][j] = (94 - randomNum > 0);
+                                            }
+
+                                        }
+                                    }
+                                    break;
+                                case 2:
+                                    if (matrix[i + 1][j] == true)
+                                    {
+                                        //шанс 1 к 5, что станет облачной
+                                        int randomNum = rand() % 5;
+                                        new_matrix[i][j] = (randomNum == 1);
+                                    }
+                                    else
+                                    {
+                                        //шанс 1 к 300, что станет облачной
+                                        int randomNum = rand() % 300;
+                                        new_matrix[i][j] = (randomNum == 1);
+                                        //если эта ячейка с краю, откуда дует ветер
+                                        if (i == rows - 1)
+                                        {
+                                            //шанс 80 к 100, что станет облачной
+                                            int randomNum = rand() % 100;
+                                            new_matrix[i][j] = (79 - randomNum > 0);
+                                            if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
+                                            {
+                                                //шанс 95 к 100, что станет облачной
+                                                int randomNum = rand() % 100;
+                                                new_matrix[i][j] = (94 - randomNum > 0);
+                                            }
+
+                                        }
+                                    }
+                                    break;
+                                case 3:
+                                    if (matrix[i][j - 1] == true)
+                                    {
+                                        //шанс 1 к 5, что станет облачной
+                                        int randomNum = rand() % 5;
+                                        new_matrix[i][j] = (randomNum == 1);
+                                    }
+                                    else
+                                    {
+                                        //шанс 1 к 300, что станет облачной
+                                        int randomNum = rand() % 300;
+                                        new_matrix[i][j] = (randomNum == 1);
+                                        //если эта ячейка с краю, откуда дует ветер
+                                        if (j == 0)
+                                        {
+                                            //шанс 80 к 100, что станет облачной
+                                            int randomNum = rand() % 100;
+                                            new_matrix[i][j] = (79 - randomNum > 0);
+                                            if (matrix[i - 1][j] == true || matrix[i + 1][j] == true || matrix[i][j - 1] == true || matrix[i][j + 1] == true)
+                                            {
+                                                //шанс 95 к 100, что станет облачной
+                                                int randomNum = rand() % 100;
+                                                new_matrix[i][j] = (94 - randomNum > 0);
+                                            }
+
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                            //если вокруг нет облачных ячеек
+                            else
+                            {
+                                //шанс 1 к 200, что станет облачной
+                                int randomNum = rand() % 200;
+                                new_matrix[i][j] = (randomNum == 1);
+                            }
+                        }
+                    }
+                }
+                //если идет дождь
+                else
+                {
+                    new_matrix[i][j] = true;
+                    rain_duration--;
+                    //если дождь закончился, уменьшаем спавн облаков
+                    if (rain_duration == 0)
+                    {
+                        ratio = 40;
+                    }
                 }
             }
         }
-    }
-    //может поменяться ветер
-    if (rand() % 70 == 1)
-    {
-        int newWind = rand() % 2;
-        switch (wind)
+        //может поменяться ветер
+        if (rand() % 70 == 1)
         {
-        case 0:
-            if(newWind==1)
+            int newWind = rand() % 2;
+            switch (wind)
             {
-                wind++;
+            case 0:
+                if(newWind==1)
+                {
+                    wind++;
+                }
+                else
+                {
+                    wind=3;
+                }
+                break;
+            case 1:
+                if(newWind==1)
+                {
+                    wind++;
+                }
+                else
+                {
+                    wind--;
+                }
+                break;
+            case 2:
+                if(newWind==1)
+                {
+                    wind++;
+                }
+                else
+                {
+                    wind--;
+                }
+                break;
+            case 3:
+                if(newWind==1)
+                {
+                    wind = 0;
+                }
+                else
+                {
+                    wind--;
+                }
+                break;
             }
-            else
-            {
-                wind=3;
-            }
-            break;
-        case 1:
-            if(newWind==1)
-            {
-                wind++;
-            }
-            else
-            {
-                wind--;
-            }
-            break;
-        case 2:
-            if(newWind==1)
-            {
-                wind++;
-            }
-            else
-            {
-                wind--;
-            }
-            break;
-        case 3:
-            if(newWind==1)
-            {
-                wind = 0;
-            }
-            else
-            {
-                wind--;
-            }
-            break;
+            wind = rand() % 4;
         }
-        wind = rand() % 4;
-    }
-    //случаи, если стало много облаков и нет дождя
-    if (static_cast<double>(cloud_count) / static_cast<double>(cols * rows) >= 0.625 && rain_duration == 0)
-    {
-        //может пойти дождь, если облаков накопилось слишком много
-        if (static_cast<double>(cloud_count) / static_cast<double>(cols * rows) >= 0.8 && rand() % 3 == 1)
+        //случаи, если стало много облаков и нет дождя
+        if (static_cast<double>(cloud_count) / static_cast<double>(cols * rows) >= 0.625 && rain_duration == 0)
         {
-            rain_duration = rand() % 9000 + 3000;
+            //может пойти дождь, если облаков накопилось слишком много
+            if (static_cast<double>(cloud_count) / static_cast<double>(cols * rows) >= 0.8 && rand() % 3 == 1)
+            {
+                rain_duration = rand() % 9000 + 3000;
+            }
+            //может уменьшиться спавн облаков
+            else
+            {
+                if(rand() % 40 == 1)
+                {
+                    ratio = (rand() % 2 + 1) * (rand() % 2 + 1) * 2;
+                }
+            }
         }
-        //может уменьшиться спавн облаков
+        //если облаков не много, то шанс спавна облаков может прийти в норму (наибольшая вероятность спавна)
         else
         {
-            if(rand() % 40 == 1)
+            if (rand() % 80 == 1)
             {
-                ratio = (rand() % 2 + 1) * (rand() % 2 + 1) * 2;
+                ratio = 1;
             }
         }
+        if(cloud_count == 400)
+        {
+            currentKosState = 5;
+        }
+        cloud_count = 0;
+        currentSecsToUpdateWeather = 1;
     }
-    //если облаков не много, то шанс спавна облаков может прийти в норму (наибольшая вероятность спавна)
     else
     {
-        if (rand() % 80 == 1)
-        {
-            ratio = 1;
-        }
+        currentSecsToUpdateWeather++;
     }
-    cloud_count = 0;
     //закончили обновление погоды
 
 
@@ -1157,13 +1202,42 @@ void DataManager::oneHzTimerElapsed()
 
 
 
-    if(matrix[sessions[globalCurrentSessionArrayPos].ka->posY][sessions[globalCurrentSessionArrayPos].ka->posX] == false && sessions[globalCurrentSessionArrayPos].cState == InProgress)
+    if(sessions[globalCurrentSessionArrayPos].factSessionTimeEnd > QDateTime::currentDateTime() && sessions[globalCurrentSessionArrayPos].factSessionTimeStart <= QDateTime::currentDateTime() && matrix[sessions[globalCurrentSessionArrayPos].ka->posY][sessions[globalCurrentSessionArrayPos].ka->posX] == false && sessions[globalCurrentSessionArrayPos].cState == InProgress)
     {
         sessions[globalCurrentSessionArrayPos].answers += getRandomInt(1, 10);
+        currentKosState = 1;
+    }
+    else
+    {
+        if(currentKosState != 5)
+        {
+            if(sessions[globalCurrentSessionArrayPos].factSessionTimeEnd > QDateTime::currentDateTime() && matrix[sessions[globalCurrentSessionArrayPos].ka->posY][sessions[globalCurrentSessionArrayPos].ka->posX] == true && sessions[globalCurrentSessionArrayPos].cState == InProgress)
+            {
+                currentKosState = 6;
+            }
+            else
+            {
+                if(sessions[globalCurrentSessionArrayPos].cState != 0 && sessions[globalCurrentSessionArrayPos].cState != 1 && sessions[globalCurrentSessionArrayPos].cState != 2 && QDateTime::currentDateTime() < sessions[globalCurrentSessionArrayPos + 1].factSessionTimeStart)
+                {
+                    currentKosState = 4;
+                }
+                else
+                {
+                    if(QDateTime::currentDateTime() > sessions[globalCurrentSessionArrayPos + 1].factSessionTimeStart && matrix[sessions[globalCurrentSessionArrayPos + 1].ka->posY][sessions[globalCurrentSessionArrayPos + 1].ka->posX] == true)
+                    {
+                        currentKosState = 2;
+                    }
+                    else
+                    {
+                        currentKosState = 3;
+                    }
+                }
+            }
+        }
     }
 
     // если закончился текущий сеанс
-    if(sessions[globalCurrentSessionArrayPos].factSessionTimeEnd <= QDateTime::currentDateTime() || sessions[globalCurrentSessionArrayPos].answers >= satellitePlanningSettings.find(satellites[sessions[globalCurrentSessionArrayPos].ka->id]).value().pointsAmount)
+    if(sessions[globalCurrentSessionArrayPos].factSessionTimeEnd <= QDateTime::currentDateTime() || sessions[globalCurrentSessionArrayPos].answers >= sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount * 180)
     {
         //qDebug() << "cur session " << sessions[globalCurrentSessionArrayPos].factSessionTimeStart;
         //qDebug() << "nxt session " << sessions[globalCurrentSessionArrayPos + 1].factSessionTimeStart;
@@ -1171,7 +1245,7 @@ void DataManager::oneHzTimerElapsed()
         // этот сеанс заканчиваем
         if(!(sessions[globalCurrentSessionArrayPos].cState == Done) && !(sessions[globalCurrentSessionArrayPos].cState == FailedUnknown) && !(sessions[globalCurrentSessionArrayPos].cState == FailedTech) && !(sessions[globalCurrentSessionArrayPos].cState == FailedWeather))
         {
-            if(sessions[globalCurrentSessionArrayPos].answers >= satellitePlanningSettings.find(satellites[sessions[globalCurrentSessionArrayPos].ka->id]).value().pointsAmount) //если ответов достаточно
+            if(sessions[globalCurrentSessionArrayPos].answers >= sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount * 180) //если ответов достаточно
             {
                 sessions[globalCurrentSessionArrayPos].cState = Done; //вероятнее всего, статус будет Выполнен
                 if(!getRandomInt(10)) //но кубик может решить иначе
@@ -1181,7 +1255,15 @@ void DataManager::oneHzTimerElapsed()
             }
             else //если ответов недостаточно
             {
-                sessions[globalCurrentSessionArrayPos].cState = static_cast<CompletionState>(getRandomInt(2) + 4);   //кубик решает, какой будет статус из "неудачных"
+                if(currentKosState == 5 || matrix[sessions[globalCurrentSessionArrayPos].ka->posY][sessions[globalCurrentSessionArrayPos].ka->posX] == true)
+                {
+                    sessions[globalCurrentSessionArrayPos].cState = static_cast<CompletionState>(4);
+                }
+                else
+                {
+                    sessions[globalCurrentSessionArrayPos].cState = static_cast<CompletionState>(getRandomInt(1) + 5);   //кубик решает, какой будет статус из "неудачных"
+                    currentKosState = 3;
+                }
             }
         }
 
@@ -1203,18 +1285,80 @@ void DataManager::oneHzTimerElapsed()
     //        }
     //        if(newGlobalCurrentSessionArrayPos == 0)
     //        {
+                Session newCurrentSession;
+                bool init = false;
                 for(int i = 1; newGlobalCurrentSessionArrayPos == 0 && (globalCurrentSessionArrayPos + i <= sessions.length() - 1) && (sessions[globalCurrentSessionArrayPos + i].factSessionTimeStart <= QDateTime::currentDateTime()) && newGlobalCurrentSessionArrayPos == 0; i++)
                 {
-                    if((sessions[globalCurrentSessionArrayPos + i].cState == PlannedFixed || sessions[globalCurrentSessionArrayPos + i].cState == PlannedRange) && matrix[sessions[globalCurrentSessionArrayPos + i].ka->posY][sessions[globalCurrentSessionArrayPos + i].ka->posX] == false)
+                    if(sessions[globalCurrentSessionArrayPos + i].factSessionTimeEnd <= QDateTime::currentDateTime()) // если в запланированных сеансах попался тот, время которого истекло
                     {
-                        newGlobalCurrentSessionArrayPos = globalCurrentSessionArrayPos + i;
-                        Session tempNewSession = sessions[newGlobalCurrentSessionArrayPos];
-                        while(i > 1)
+                        sessions[globalCurrentSessionArrayPos + i].cState = static_cast<CompletionState>(getRandomInt(1) + 5);   //кубик решает, какой будет статус из "неудачных"
+                    }
+                    else
+                    {
+                        if((sessions[globalCurrentSessionArrayPos + i].cState == PlannedFixed || sessions[globalCurrentSessionArrayPos + i].cState == PlannedRange) && matrix[sessions[globalCurrentSessionArrayPos + i].ka->posY][sessions[globalCurrentSessionArrayPos + i].ka->posX] == false)
                         {
-                            sessions[globalCurrentSessionArrayPos + i] = sessions[globalCurrentSessionArrayPos + i - 1];
-                            i--;
+                            switch (satellitePlanningSettings.find(sessions[globalCurrentSessionArrayPos + i].ka).value().priority)
+                            {
+                            case 3:
+                            {
+                                newGlobalCurrentSessionArrayPos = globalCurrentSessionArrayPos + i;
+                                Session tempNewSession = sessions[newGlobalCurrentSessionArrayPos];
+                                while(i > 1)
+                                {
+                                    sessions[globalCurrentSessionArrayPos + i] = sessions[globalCurrentSessionArrayPos + i - 1];
+                                    i--;
+                                }
+                                sessions[globalCurrentSessionArrayPos + 1] = tempNewSession;
+                                break;
+                            }
+                            case 2:
+                            {
+                                if(init && satellitePlanningSettings.find(newCurrentSession.ka).value().priority < 2)
+                                {
+                                    Session newCurrentSession = sessions[globalCurrentSessionArrayPos + i];
+                                }
+                                else
+                                {
+                                    if(!init)
+                                    {
+                                        Session newCurrentSession = sessions[globalCurrentSessionArrayPos + i];
+                                    }
+                                }
+                                if(sessions[globalCurrentSessionArrayPos + i + 1].factSessionTimeStart >= QDateTime::currentDateTime())
+                                {
+                                    newGlobalCurrentSessionArrayPos = globalCurrentSessionArrayPos + i;
+                                    Session tempNewSession = sessions[newGlobalCurrentSessionArrayPos];
+                                    while(i > 1)
+                                    {
+                                        sessions[globalCurrentSessionArrayPos + i] = sessions[globalCurrentSessionArrayPos + i - 1];
+                                        i--;
+                                    }
+                                    sessions[globalCurrentSessionArrayPos + 1] = tempNewSession;                                     }
+                                break;
+                            }
+                            case 1:
+                            {
+                                if(!init)
+                                {
+                                    Session newCurrentSession = sessions[globalCurrentSessionArrayPos + i];
+                                }
+                                if(sessions[globalCurrentSessionArrayPos + i + 1].factSessionTimeStart >= QDateTime::currentDateTime())
+                                {
+                                    newGlobalCurrentSessionArrayPos = globalCurrentSessionArrayPos + i;
+                                    Session tempNewSession = sessions[newGlobalCurrentSessionArrayPos];
+                                    while(i > 1)
+                                    {
+                                        sessions[globalCurrentSessionArrayPos + i] = sessions[globalCurrentSessionArrayPos + i - 1];
+                                        i--;
+                                    }
+                                    sessions[globalCurrentSessionArrayPos + 1] = tempNewSession;                                     }
+                                break;
+                            }
+                            default:
+                                break;
+                            }
+
                         }
-                        sessions[globalCurrentSessionArrayPos + 1] = tempNewSession;
                     }
                 }
                 globalCurrentSessionArrayPos++;
@@ -1255,7 +1399,16 @@ void DataManager::oneHzTimerElapsed()
         if(manualModeInfos.contains(curManualSessionSatId))
             manualModeInfos[curManualSessionSatId]->infoText = QString("Идут измерения: %1 точек").arg(curManualSessionPoints);
     }
+}
 
+QPair<int, int> DataManager::getKosState()
+{
+
+    if(currentKosState == 3)
+    {
+        errorsCount++;
+    }
+    return qMakePair(currentKosState, errorsCount);
 }
 
 
