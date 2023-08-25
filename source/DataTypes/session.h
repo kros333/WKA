@@ -24,6 +24,7 @@ struct Session
     CompletionState cState;
     int answers;
     SatellitePlanningRule currentPlanningRule;
+    int WindowId;
 };
 
 #endif // SESSION_H

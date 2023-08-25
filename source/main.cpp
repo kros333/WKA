@@ -6,6 +6,7 @@
 #define DEFAULT_PORT 55555
 #define DAYS_TO_LEFT 20
 #define DAYS_TO_RIGHT 5
+#define WEATHER_UPDATE_FREQ 5
 
 int main(int argc, char *argv[])
 {
@@ -25,20 +26,24 @@ int main(int argc, char *argv[])
 
     // days to left option
     QCommandLineOption daysLeftOption(QStringList() << "l" << "daysleft",
-                 "How many days days to generate to the left (past days)", "daysleft", QString::number(DAYS_TO_LEFT));
+                                      "How many days days to generate to the left (past days)", "daysleft", QString::number(DAYS_TO_LEFT));
     parser.addOption(daysLeftOption);
 
     // days to right option
     QCommandLineOption daysRightOption(QStringList() << "r" << "daysright",
-                 "How many days days to generate to the right (future days)", "daysright", QString::number(DAYS_TO_RIGHT));
+                                       "How many days days to generate to the right (future days)", "daysright", QString::number(DAYS_TO_RIGHT));
     parser.addOption(daysRightOption);
-
+    //weather update freq
+    QCommandLineOption weatherUOption(QStringList() << "w" << "weather",
+                                      "Sets TCP server port.", "weather", QString::number(WEATHER_UPDATE_FREQ));
+    parser.addOption(weatherUOption);
     parser.process(a);
 
     quint16 servPort = parser.value(portOption).toUShort();
     quint16 daysToLeft = parser.value(daysLeftOption).toUShort();
     quint16 daysToRight = parser.value(daysRightOption).toUShort();
-    KosTcpServer server(servPort, daysToLeft, daysToRight);
+    int weatherUpdFreq = parser.value(weatherUOption).toInt();
+    KosTcpServer server(servPort, daysToLeft, daysToRight, weatherUpdFreq);
 
     return a.exec();
 }

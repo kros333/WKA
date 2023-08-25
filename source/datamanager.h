@@ -13,7 +13,7 @@ class DataManager : public QObject
 {
    Q_OBJECT
 public:
-    DataManager(quint16 daysToLeft, quint16 daysToRight);
+    DataManager(quint16 daysToLeft, quint16 daysToRight, int weatherUpdFreq);
     //virtual ~DataManager();
     const QVector<Session> getSessions(QDateTime targetTime, int limitBack, int limitForward, SessionsTableFilterOptions filter);
     int getSessionsCount();
@@ -37,6 +37,12 @@ public:
     bool getCurManualSessionIsRunning() { return manualSessionIsRunning;}
     QString getCurManualSessionInfoText();
     QPair<int, int> getKosState();
+    bool CheckIncludingQDT(int check, int start, int end);
+    const static int rows = 20;
+    const static int cols = 20;
+    bool matrix[rows][cols];
+    bool new_matrix[rows][cols];
+    int cloud_count = 0;
 
     WeatherWidget weatherWidget;
 
@@ -64,17 +70,12 @@ private:
     int manualSessionIsRunning = false;
     int currentKosState = 4;
     int errorsCount = 0;
-    const static int rows = 20;
-    const static int cols = 20;
-    bool matrix[rows][cols];
-    bool new_matrix[rows][cols];
-    int cloud_count = 0;
     int ratio = 1;
     int rain_duration = 0;
     int wind = rand() % 4;
     int secsToUpdateWeather = 1;
     int currentSecsToUpdateWeather = 1;
-        int debug = 0;
+    bool firstChangeRain = false;
 };
 
 #endif // DATAMANAGER_H

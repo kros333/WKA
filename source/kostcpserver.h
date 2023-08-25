@@ -14,8 +14,9 @@
 class KosTcpServer : public QTcpServer
 {
 public:
-    KosTcpServer(quint16 port, quint16 daysToLeft, quint16 daysToRight);
+    KosTcpServer(quint16 port, quint16 daysToLeft, quint16 daysToRight, int weatherUpdFreq);
     ~KosTcpServer();
+    DataManager* dm = nullptr;
 
 private slots:
     void newClient();
@@ -30,7 +31,6 @@ private:
     void sendSatellitePlanningRules(const QJsonObject &jObj, QTcpSocket* socket);
     QList<QByteArray> splitJsons(const QByteArray &input, bool &ok);
     void mapJsonRequest(const QJsonObject &jObj, QTcpSocket *socket);
-    DataManager* dm = nullptr;
     void sendSatelliteDictionary(const QJsonObject &jObj, QTcpSocket *socket);
     void sendSatelliteName(const QJsonObject &jObj, QTcpSocket *socket);
     void sendSatelliteWindows(const QJsonObject &jObj, QTcpSocket *socket);

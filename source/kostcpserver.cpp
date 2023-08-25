@@ -1,6 +1,6 @@
 #include "kostcpserver.h"
 
-KosTcpServer::KosTcpServer(quint16 port, quint16 daysToLeft, quint16 daysToRight)
+KosTcpServer::KosTcpServer(quint16 port, quint16 daysToLeft, quint16 daysToRight, int weatherUpdFreq)
 {
 
     if(!this->listen(QHostAddress::AnyIPv4, port))
@@ -11,7 +11,7 @@ KosTcpServer::KosTcpServer(quint16 port, quint16 daysToLeft, quint16 daysToRight
     connect(this, &QTcpServer::newConnection, this, &KosTcpServer::newClient);
 
 
-    dm = new DataManager(daysToLeft, daysToRight);
+    dm = new DataManager(daysToLeft, daysToRight, weatherUpdFreq);
 }
 
 KosTcpServer::~KosTcpServer()
@@ -250,6 +250,7 @@ void KosTcpServer::sendSessionsGrid(const QJsonObject &jObj, QTcpSocket* socket)
             jSummaryByKa["satId"] = satId;
             jSummaryByKa["sessionsDone"] = foundSessionSummaries[day][satId].sessionsDone;
             jSummaryByKa["sessionsTotal"] = foundSessionSummaries[day][satId].sessionsTotal;
+            jSummaryByKa["colored"] = foundSessionSummaries[day][satId].colored;
             jSessionsOfDay << jSummaryByKa;
         }
         jDaySummary["sessionsBySatId"] = jSessionsOfDay;
@@ -289,7 +290,7 @@ void KosTcpServer::sendSessionsRibbons(const QJsonObject &jObj, QTcpSocket* sock
                 QJsonObject jOneSession;
                 jOneSession["sessionFrom"] = QString::number(sessionInfo.first.start.toSecsSinceEpoch());
                 jOneSession["sessionTo"] = QString::number(sessionInfo.first.end.toSecsSinceEpoch());
-                jOneSession["state"] = getCompletionStateString(sessionInfo.second);
+                jOneSession["state"] = getCompletionStateString(sessionInfo.second.second);
                 jSessions << jOneSession;
             }
             jSingleVisibility["sessions"] = jSessions;

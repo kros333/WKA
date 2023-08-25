@@ -3,6 +3,7 @@
 #include "ui_weatherwidget.h"
 
 
+
 WeatherWidget::WeatherWidget(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::WeatherWidget)
@@ -22,3 +23,27 @@ void WeatherWidget::updateText(QString s)
 
 
 
+
+void WeatherWidget::on_checkBox_stateChanged(int arg1)
+{
+    if(rain)
+    {
+        rain = false;
+    }
+    else
+    {
+        rain = true;
+    }
+}
+
+void WeatherWidget::on_checkBox_2_stateChanged(int arg1)
+{
+    if(errors)
+    {
+        errors = false;
+    }
+    else
+    {
+        errors = true;
+    }
+}

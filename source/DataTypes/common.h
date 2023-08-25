@@ -56,6 +56,7 @@ struct SessionsDoneOutOfTotal
 {
     int sessionsDone = 0;
     int sessionsTotal = 0;
+    bool colored = true;
 };
 typedef QMap<int, SessionsDoneOutOfTotal> CompletedSessionsBySatId;
 
@@ -85,8 +86,8 @@ struct VisibilityWindowSummary
 //    QList<TimeSpan> cloudy;
 //    QList<TimeSpan> rainy;
     QList<WeatherSpan> weathers;
-    QList<QPair<TimeSpan, CompletionState>> sessions;
-
+    QList<QPair<TimeSpan, QPair<int, CompletionState>>> sessions;
+    int kaId;
 };
 
 //typedef QMap<Satellite, SatellitePlanningRule> SatellitePlanningSettings;
