@@ -56,12 +56,55 @@ DataManager::DataManager(quint16 daysToLeft, quint16 daysToRight, int weatherUpd
     VisibilityWindowSummary vis;
     QDateTime crawlDt = historyStartDt;
     QList<QDateTime> LastKaVis;
+
+    switch(crawlDt.date().month())
+    {
+    case 1:
+        currentTemp = getRandomInt(-35, -10);
+        break;
+    case 2:
+        currentTemp = getRandomInt(-15, 10);
+        break;
+    case 3:
+        currentTemp = getRandomInt(-5, 15);
+        break;
+    case 4:
+        currentTemp = getRandomInt(-5, 20);
+        break;
+    case 5:
+        currentTemp = getRandomInt(5, 25);
+        break;
+    case 6:
+        currentTemp = getRandomInt(15, 30);
+        break;
+    case 7:
+        currentTemp = getRandomInt(20, 35);
+        break;
+    case 8:
+        currentTemp = getRandomInt(20, 35);
+        break;
+    case 9:
+        currentTemp = getRandomInt(15, 25);
+        break;
+    case 10:
+        currentTemp = getRandomInt(5, 20);
+        break;
+    case 11:
+        currentTemp = getRandomInt(-5, 10);
+        break;
+    case 12:
+        currentTemp = getRandomInt(-20, 0);
+        break;
+    }
+    currentWindSpeed = getRandomInt(0,25);
+
     for (int i = 0; i < satellites.length(); i++)
     {
         LastKaVis << QDateTime::currentDateTime().addDays(-3000);
     }
     while (crawlDt < futureStopDt)
     {
+
         int sessionsLeftInWindow = 0;
         crawlDt = crawlDt.addSecs(getRandomInt(3, 30)*60);
         int currentKaId;
@@ -187,19 +230,21 @@ DataManager::DataManager(quint16 daysToLeft, quint16 daysToRight, int weatherUpd
                 sessions << s;
                 vis.sessions << qMakePair(TimeSpan(s.factSessionTimeStart, s.factSessionTimeEnd), qMakePair(s.id, s.cState));
                 sessionsLeftInWindow--;
+
+
+//                if(crawlDt <= QDateTime::currentDateTime() /*&& !getRandomInt(40)*/)
+//                    journal.append({QString::number(journal.length() + 1), QString::number(crawlDt.toSecsSinceEpoch()), "Сообщение №" + QString::number(journal.length() + 1)});
+//                if(crawlDt <= QDateTime::currentDateTime() /*&& !getRandomInt(100)*/)
+//                    tests.append({QString::number(tests.length() + 1), QString::number(crawlDt.toSecsSinceEpoch()), getRandomInt(1)?"В наличии":"Отсутствует", getRandomInt(1)?"В наличии":"Отсутствует",QString::number(tests.length() + 1)});
+//                if(crawlDt <= QDateTime::currentDateTime() /*&& !getRandomInt(50)*/)
+//                    fnks.append({QString::number(fnks.length() + 1), QString::number(crawlDt.toSecsSinceEpoch()), getRandomInt(1)?"Да":"Нет", getRandomInt(1)?"Да":"Нет", "#" + QString::number(fnks.length() + 1)});
+//                if(crawlDt <= QDateTime::currentDateTime() /*&& !getRandomInt(50)*/)
+//                    meteos.append({QString::number(meteos.length() + 1), QString::number(crawlDt.toSecsSinceEpoch()), QString::number(getRandomInt(-20,40)), QString::number(meteos.length() + 1) + "м/с"});
             }
         }
         windows << qMakePair(currentKaId, vis);
 
-        //ТЕХ СОСТ + МЕТЕО
-        if(crawlDt <= QDateTime::currentDateTime() && !getRandomInt(40))
-            journal.append({QString::number(journal.length() + 1), QString::number(crawlDt.toSecsSinceEpoch()), "Сообщение №" + QString::number(journal.length() + 1)});
-        if(crawlDt <= QDateTime::currentDateTime() && !getRandomInt(100))
-            tests.append({QString::number(tests.length() + 1), QString::number(crawlDt.toSecsSinceEpoch()), getRandomInt(1)?"В наличии":"Отсутствует", getRandomInt(1)?"В наличии":"Отсутствует",QString::number(tests.length() + 1)});
-        if(crawlDt <= QDateTime::currentDateTime() && !getRandomInt(50))
-            fnks.append({QString::number(fnks.length() + 1), QString::number(crawlDt.toSecsSinceEpoch()), getRandomInt(1)?"Да":"Нет", getRandomInt(1)?"Да":"Нет", "#" + QString::number(fnks.length() + 1)});
-        if(crawlDt <= QDateTime::currentDateTime() && !getRandomInt(50))
-            meteos.append({QString::number(meteos.length() + 1), QString::number(crawlDt.toSecsSinceEpoch()), QString::number(getRandomInt(-20,40)), QString::number(meteos.length() + 1) + "м/с"});
+
 
 
     }
@@ -210,6 +255,88 @@ DataManager::DataManager(quint16 daysToLeft, quint16 daysToRight, int weatherUpd
 
     while(sessions[globalCurrentSessionArrayPos].cState > 1 && globalCurrentSessionArrayPos < sessions.length())
     {
+        //ТЕХ СОСТ + МЕТЕО
+        if(sessions[globalCurrentSessionArrayPos].factSessionTimeStart <= QDateTime::currentDateTime())
+        {
+            journal.append({QString::number(journal.length() + 1), QString::number(sessions[globalCurrentSessionArrayPos].factSessionTimeStart.toSecsSinceEpoch()), "Сообщение №" + QString::number(journal.length() + 1)});
+            int numberOfShift = 1;
+            if(sessions[globalCurrentSessionArrayPos].factSessionTimeStart.time() >= QTime(8, 0, 0, 0))
+            {
+                numberOfShift = 2;
+                if(sessions[globalCurrentSessionArrayPos].factSessionTimeStart.time() >= QTime(16, 0, 0, 0))
+                {
+                    numberOfShift = 3;
+                }
+            }
+            tests.append({QString::number(tests.length() + 1), QString::number(sessions[globalCurrentSessionArrayPos].factSessionTimeStart.toSecsSinceEpoch()), getRandomInt(4)?"В наличии":"Отсутствует", getRandomInt(4)?"В наличии":"Отсутствует",QString::number(numberOfShift)});
+            fnks.append({QString::number(fnks.length() + 1), QString::number(sessions[globalCurrentSessionArrayPos].factSessionTimeStart.toSecsSinceEpoch()), getRandomInt(4)?"Да":"Нет", getRandomInt(4)?"Да":"Нет", getRandomInt(4)?"Да":"Нет"});
+            if(!getRandomInt(1))
+            {
+                currentWindSpeed = currentWindSpeed + getRandomInt(-2,2);
+                if(currentWindSpeed > 25)
+                {
+                    currentWindSpeed = currentWindSpeed - 2;
+                }
+                if(currentWindSpeed < 0)
+                {
+                    currentWindSpeed = currentWindSpeed + 2;
+                }
+                if(!getRandomInt(2))
+                {
+                    if (currentWindSpeed > 12)
+                    {
+                        currentWindSpeed--;
+                    }
+                    if (currentWindSpeed < 4)
+                    {
+                        currentWindSpeed++;
+                    }
+                }
+            }
+            if(!getRandomInt(200))
+            {
+                switch(crawlDt.date().month())
+                {
+                case 1:
+                    currentTemp = getRandomInt(-35, -10);
+                    break;
+                case 2:
+                    currentTemp = getRandomInt(-15, 10);
+                    break;
+                case 3:
+                    currentTemp = getRandomInt(-5, 15);
+                    break;
+                case 4:
+                    currentTemp = getRandomInt(-5, 20);
+                    break;
+                case 5:
+                    currentTemp = getRandomInt(5, 25);
+                    break;
+                case 6:
+                    currentTemp = getRandomInt(15, 30);
+                    break;
+                case 7:
+                    currentTemp = getRandomInt(20, 35);
+                    break;
+                case 8:
+                    currentTemp = getRandomInt(20, 35);
+                    break;
+                case 9:
+                    currentTemp = getRandomInt(15, 25);
+                    break;
+                case 10:
+                    currentTemp = getRandomInt(5, 20);
+                    break;
+                case 11:
+                    currentTemp = getRandomInt(-5, 10);
+                    break;
+                case 12:
+                    currentTemp = getRandomInt(-20, 0);
+                    break;
+                }
+            }
+            meteos.append({QString::number(meteos.length() + 1), QString::number(sessions[globalCurrentSessionArrayPos].factSessionTimeStart.toSecsSinceEpoch()), QString::number(currentTemp + getRandomInt(-3,3)), QString::number(currentWindSpeed) + " м/с"});
+        }
         globalCurrentSessionArrayPos++;
     }
     globalCurrentSessionArrayPos--;
@@ -232,15 +359,27 @@ DataManager::DataManager(quint16 daysToLeft, quint16 daysToRight, int weatherUpd
     {
         ManualModeRecord* mmr = new ManualModeRecord();
         mmr->infoText = "";
-        //50/50 chanche for availible window or window in future
-        if(getRandomInt(1))
-            mmr->visibility = TimeSpan(curDt.addSecs(-1 * getRandomInt(600)),curDt.addSecs(getRandomInt(599) + 1));
-        else
-            mmr->visibility = TimeSpan(curDt.addSecs(getRandomInt(600)),curDt.addSecs(getRandomInt(599) + 1 + 600));
-        mmr->weatherVal = static_cast<Weather>(getRandomInt(1));
+        for (int i = 0; i < windows.length(); i++)
+        {
+            if(windows[i].first == sat->id - 1 && windows[i].second.startEnd.start <= QDateTime::currentDateTime() && windows[i].second.startEnd.end > QDateTime::currentDateTime())
+            {
+                mmr->visibility = TimeSpan(windows[i].second.startEnd.start, windows[i].second.startEnd.end);
+                i = windows.length();
+            }
+            else
+            {
+                if(windows[i].first == sat->id - 1 && windows[i].second.startEnd.start >= QDateTime::currentDateTime())
+                {
+                    mmr->visibility = TimeSpan(windows[i].second.startEnd.start, windows[i].second.startEnd.end);
+                    i = windows.length();
+                }
+            }
+        }
+
+        //        mmr->weatherVal = static_cast<Weather>(getRandomInt(1));
         manualModeInfos[sat->id] = mmr;
     }
-
+    qDebug() << "--------------------------------------------------------";
     oneHzTimer.setInterval(1000);
     connect(&oneHzTimer, &QTimer::timeout, this, &DataManager::oneHzTimerElapsed);
     oneHzTimer.start();
@@ -594,9 +733,9 @@ bool DataManager::writeNewSatelliteUserPlannedSession(int satId, QDateTime start
     Satellite* sat = getSatellite(satId);
     if(sat == nullptr)
     {
-        qDebug() << "ASHIBKA";
         return false;
     }
+
     VisibilityWindowSummary vis;
     int windowPosition = -1;
     for (int i = 0; i < windows.length(); i++)
@@ -609,21 +748,26 @@ bool DataManager::writeNewSatelliteUserPlannedSession(int satId, QDateTime start
     }
     if(windowPosition == -1)
     {
-        qDebug() << "ASHIBKA_1";
         return false;
     }
+
     Session s;
     s.cState = isApproximateTime ? CompletionState::PlannedRange : CompletionState::PlannedFixed;
-    int sId = editSessionId == -1 ?
-                (userPlannedSessions.isEmpty() ? 1 : userPlannedSessions.last().id + 1) :
-                editSessionId;
-    s.id = sId;
+//    int sId = editSessionId == -1 ?
+//                (userPlannedSessions.isEmpty() ? 1 : userPlannedSessions.last().id + 1) :
+//                editSessionId;
+    s.id = ++globalSessionLastUsedId;
     s.ka = sat;
     s.factSessionTimeStart = start;
 
+    s.currentPlanningRule.pointsAmount = -1;
+
     //если диапазон - то брать end, если фикс, то старт + длительность
     if(isApproximateTime)
+    {
         s.factSessionTimeEnd = end;
+        s.currentPlanningRule.pointsAmount = -10 * durationInSeconds;
+    }
     else
         s.factSessionTimeEnd = start.addSecs(durationInSeconds);
 
@@ -631,114 +775,124 @@ bool DataManager::writeNewSatelliteUserPlannedSession(int satId, QDateTime start
     s.visibilityEnd = vis.startEnd.end;
     s.currentPlanningRule = getSatellitePlanningRules().find(sat).value();
     s.currentPlanningRule.priority = SatellitePlanningPriority(3);
-    s.currentPlanningRule.pointsAmount = -1;
     bool write = false;
 
-    if(editSessionId != -1)
-    {
-        for(int i=0; i < userPlannedSessions.length();i++)
-        {
-            if(userPlannedSessions[i].id == editSessionId)
-            {
-                userPlannedSessions[i] = s;
-                for (int i = globalCurrentSessionArrayPos; i < sessions.length(); i++)
-                {
-                    if(sessions[i].ka->id == satId && (DataManager::CheckIncludingQDT(s.factSessionTimeStart.toSecsSinceEpoch(), sessions[i].factSessionTimeStart.toSecsSinceEpoch(), sessions[i].factSessionTimeEnd.toSecsSinceEpoch()) || DataManager::CheckIncludingQDT(s.factSessionTimeEnd.toSecsSinceEpoch(), sessions[i].factSessionTimeStart.toSecsSinceEpoch(), sessions[i].factSessionTimeEnd.toSecsSinceEpoch())))
-                    {
-                        if(write == false)
-                        {
-                            for (int e = 0; e < windows[windowPosition].second.sessions.length(); e++)
-                            {
-                                if(windows[windowPosition].second.sessions[e].second.first == sessions[i].id)
-                                {
-                                    windows[windowPosition].second.sessions[e].first.start = s.factSessionTimeStart;
-                                    windows[windowPosition].second.sessions[e].first.end = s.factSessionTimeEnd;
-                                    windows[windowPosition].second.sessions[e].second.first = s.id;
-                                    windows[windowPosition].second.sessions[e].second.second = s.cState;
-                                    e = windows[windowPosition].second.sessions.length();
-                                }
-                            }
-                            sessions[i] = s;
-                            write = true;
-                        }
-                        else
-                        {
-                            for (int e = 0; e < windows[windowPosition].second.sessions.length(); e++)
-                            {
-                                if(windows[windowPosition].second.sessions[e].second.first == sessions[i].id)
-                                {
-                                    windows[windowPosition].second.sessions.removeAt(e);
-                                    e = windows[windowPosition].second.sessions.length();
-                                }
-                            }
-                            for (int j = i; j < sessions.length(); j++)
-                            {
-                                sessions[j] = sessions[j + 1];
-                            }
-                            sessions.remove(sessions.length() - 1);
-                        }
-                    }
-                }
-                if(write == false)
-                {
-                    sessions << s;
-                    windows[windowPosition].second.sessions << qMakePair(TimeSpan(s.factSessionTimeStart, s.factSessionTimeEnd), qMakePair(s.id, s.cState));
-                }
-                std::sort(sessions.begin(), sessions.end(), [](const Session& s1, const Session& s2)
-                {
-                    return s1.factSessionTimeStart < s2.factSessionTimeStart;
-                });
-                return true;
-            }
-        }
-        qDebug() << "ASHIBKA_2";
-        return false; // если в цикле не нашлось такого id
-    }
+//    if(editSessionId != -1)
+//    {
+//        for(int i=0; i < userPlannedSessions.length();i++)
+//        {
+//            if(userPlannedSessions[i].id == editSessionId)
+//            {
+//                userPlannedSessions[i] = s;
+//                for (int i = globalCurrentSessionArrayPos; i < sessions.length(); i++)
+//                {
+//                    if(sessions[i].ka->id == satId && (DataManager::CheckIncludingQDT(s.factSessionTimeStart.toSecsSinceEpoch(), sessions[i].factSessionTimeStart.toSecsSinceEpoch(), sessions[i].factSessionTimeEnd.toSecsSinceEpoch()) || DataManager::CheckIncludingQDT(s.factSessionTimeEnd.toSecsSinceEpoch(), sessions[i].factSessionTimeStart.toSecsSinceEpoch(), sessions[i].factSessionTimeEnd.toSecsSinceEpoch())))
+//                    {
+//                        if(write == false)
+//                        {
+//                            for (int e = 0; e < windows[windowPosition].second.sessions.length(); e++)
+//                            {
+//                                if(windows[windowPosition].second.sessions[e].second.first == sessions[i].id)
+//                                {
+//                                    windows[windowPosition].second.sessions[e].first.start = s.factSessionTimeStart;
+//                                    windows[windowPosition].second.sessions[e].first.end = s.factSessionTimeEnd;
+//                                    windows[windowPosition].second.sessions[e].second.first = s.id;
+//                                    windows[windowPosition].second.sessions[e].second.second = s.cState;
+//                                    e = windows[windowPosition].second.sessions.length();
+//                                }
+//                            }
+//                            sessions[i] = s;
+//                            write = true;
+//                        }
+//                        else
+//                        {
+//                            for (int e = 0; e < windows[windowPosition].second.sessions.length(); e++)
+//                            {
+//                                if(windows[windowPosition].second.sessions[e].second.first == sessions[i].id)
+//                                {
+//                                    windows[windowPosition].second.sessions.removeAt(e);
+//                                    e = windows[windowPosition].second.sessions.length();
+//                                }
+//                            }
+//                            for (int j = i; j < sessions.length(); j++)
+//                            {
+//                                sessions[j] = sessions[j + 1];
+//                            }
+//                            sessions.remove(sessions.length() - 1);
+//                        }
+//                    }
+//                }
+//                if(write == false)
+//                {
+//                    sessions << s;
+//                    windows[windowPosition].second.sessions << qMakePair(TimeSpan(s.factSessionTimeStart, s.factSessionTimeEnd), qMakePair(s.id, s.cState));
+//                }
+//                std::sort(sessions.begin(), sessions.end(), [](const Session& s1, const Session& s2)
+//                {
+//                    return s1.factSessionTimeStart < s2.factSessionTimeStart;
+//                });
+//                return true;
+//            }
+//        }
+//        return false; // если в цикле не нашлось такого id
+//    }
 
-    userPlannedSessions << s;
     for (int i = globalCurrentSessionArrayPos; i < sessions.length(); i++)
     {
         if(sessions[i].ka->id == satId && (DataManager::CheckIncludingQDT(s.factSessionTimeStart.toSecsSinceEpoch(), sessions[i].factSessionTimeStart.toSecsSinceEpoch(), sessions[i].factSessionTimeEnd.toSecsSinceEpoch()) || DataManager::CheckIncludingQDT(s.factSessionTimeEnd.toSecsSinceEpoch(), sessions[i].factSessionTimeStart.toSecsSinceEpoch(), sessions[i].factSessionTimeEnd.toSecsSinceEpoch())))
         {
-            if(write == false)
-            {
-                for (int e = 0; e < windows[windowPosition].second.sessions.length(); e++)
-                {
-                    if(windows[windowPosition].second.sessions[e].second.first == sessions[i].id)
-                    {
-                        windows[windowPosition].second.sessions[e].first.start = s.factSessionTimeStart;
-                        windows[windowPosition].second.sessions[e].first.end = s.factSessionTimeEnd;
-                        windows[windowPosition].second.sessions[e].second.first = s.id;
-                        windows[windowPosition].second.sessions[e].second.second = s.cState;
-                        e = windows[windowPosition].second.sessions.length();
-                    }
-                }
-                sessions[i] = s;
-                write = true;
-            }
-            else
-            {
+//            if(write == false)
+//            {
+//                for (int e = 0; e < windows[windowPosition].second.sessions.length(); e++)
+//                {
+//                    if(windows[windowPosition].second.sessions[e].second.first == sessions[i].id)
+//                    {
+//                        windows[windowPosition].second.sessions[e].first.start = s.factSessionTimeStart;
+//                        windows[windowPosition].second.sessions[e].first.end = s.factSessionTimeEnd;
+//                        windows[windowPosition].second.sessions[e].second.first = s.id;
+//                        windows[windowPosition].second.sessions[e].second.second = s.cState;
+//                        e = windows[windowPosition].second.sessions.length();
+//                    }
+//                }
+//                for (int y = 0; y < userPlannedSessions.length(); y++)
+//                {
+//                    if(userPlannedSessions[y].id == sessions[i].id)
+//                    {
+//                        userPlannedSessions.remove(y);
+//                    }
+//                }
+//                sessions[i] = s;
+//                write = true;
+//            }
+//            else
+//            {
                 for (int e = 0; e < windows[windowPosition].second.sessions.length(); e++)
                 {
                     if(windows[windowPosition].second.sessions[e].second.first == sessions[i].id)
                     {
                         windows[windowPosition].second.sessions.removeAt(e);
                         e = windows[windowPosition].second.sessions.length();
+                    }               
+                }
+                for (int y = 0; y < userPlannedSessions.length(); y++)
+                {
+                    if(userPlannedSessions[y].id == sessions[i].id)
+                    {
+                        userPlannedSessions.remove(y);
                     }
                 }
-                for (int j = i; j < sessions.length(); j++)
-                {
-                    sessions[j] = sessions[j + 1];
-                }
-                sessions.remove(sessions.length() - 1);
+                sessions.remove(i);
+                i--;
             }
-        }
+//        }
     }
-    if(write == false)
-    {
+//    if(write == false)
+//    {
+    userPlannedSessions << s;
+
         sessions << s;
         windows[windowPosition].second.sessions << qMakePair(TimeSpan(s.factSessionTimeStart, s.factSessionTimeEnd), qMakePair(s.id, s.cState));
-    }
+//    }
     std::sort(sessions.begin(), sessions.end(), [](const Session& s1, const Session& s2)
     {
         return s1.factSessionTimeStart < s2.factSessionTimeStart;
@@ -915,43 +1069,7 @@ void DataManager::oneHzTimerElapsed()
 {
     if(secsToUpdateWeather == currentSecsToUpdateWeather || weatherWidget.rain)
     {
-        QString sky = "";
-        // выводим матрицу на экран
-        for (int i = 0; i < rows; i++)
-        {
-            sky = sky + "<html><body>";
-            for (int j = 0; j < cols; j++)
-            {
-                matrix[i][j] = new_matrix[i][j];
-                if (matrix[i][j])
-                {
-                    if(sessions[globalCurrentSessionArrayPos].ka->posX == j && sessions[globalCurrentSessionArrayPos].ka->posY == i)
-                    {
-                        sky = sky + "<span style=\"background-color: Gray; color: red;\"><b>" + "[]" + "</b></span>";
-                    }
-                    else
-                    {
-                        sky = sky + "<span style=\"background-color: Gray;\">&nbsp;&nbsp;</span>";
-                    }
-                    cloud_count++;
-                }
-                else
-                {
-                    if(sessions[globalCurrentSessionArrayPos].ka->posX == j && sessions[globalCurrentSessionArrayPos].ka->posY == i)
-                    {
-                        sky = sky + "<span style=\"background-color: LightBlue; color: red;\"><b>" + "[]" + "</b></span>";
 
-                    }
-                    else
-                    {
-                        sky = sky + "<span style=\"background-color: LightBlue	;\">&nbsp;&nbsp;</span>";
-                    }
-                }
-            }
-            sky = sky + "</body></html>";
-        }
-        sky = sky + "    Wind - " + QString::number(wind) + "; Clouds - " + QString::number(cloud_count) + "/" + QString::number(rows*cols) + "<html><body></body></html>" + "Current satellite ID - " + QString::number(sessions[globalCurrentSessionArrayPos].ka->id);
-        weatherWidget.updateText(sky);
 
 
         //обновляем погоду
@@ -968,7 +1086,6 @@ void DataManager::oneHzTimerElapsed()
 
                         // присваиваем true или false в зависимости от случайного числа
                         matrix[i][j] = (randomNum == 1);
-                        cloud_count = 0;
                     }
                 }
                 firstChangeRain = false;
@@ -1332,6 +1449,15 @@ void DataManager::oneHzTimerElapsed()
                 }
                 wind = rand() % 4;
             }
+            cloud_count = 0;
+            for (int k = 0; k < rows; k++) {
+                for (int p = 0; p < cols; p++) {
+                    if(new_matrix[k][p] == true)
+                    {
+                        cloud_count++;
+                    }
+                }
+            }
             //случаи, если стало много облаков и нет дождя
             if (static_cast<double>(cloud_count) / static_cast<double>(cols * rows) >= 0.625 && rain_duration == 0)
             {
@@ -1368,10 +1494,6 @@ void DataManager::oneHzTimerElapsed()
             }
             firstChangeRain = true;
             cloud_count = rows*cols;
-        }
-        if(cloud_count >= 400)
-        {
-            currentKosState = 5; //  идет дождь
         }
         for (int i = 0; i < windows.length(); i++)
         {
@@ -1459,6 +1581,59 @@ void DataManager::oneHzTimerElapsed()
         }
 
         currentSecsToUpdateWeather = 1;
+
+        QString sky = "";
+        // выводим матрицу на экран
+        int curSatId;
+        if(isManualMode && manualSessionIsRunning)
+        {
+            curSatId = curManualSessionSatId - 1;
+        }
+        else
+        {
+            curSatId = sessions[globalCurrentSessionArrayPos].ka->id - 1;
+        }
+        for (int i = 0; i < rows; i++)
+        {
+            sky = sky + "<html><body>";
+            for (int j = 0; j < cols; j++)
+            {
+                matrix[i][j] = new_matrix[i][j];
+                if (matrix[i][j])
+                {
+                    if(satellites[curSatId]->posX == j && satellites[curSatId]->posY == i && ((isManualMode && manualSessionIsRunning) || !isManualMode))
+                    {
+                        sky = sky + "<span style=\"background-color: Gray; color: red;\"><b>" + "[]" + "</b></span>";
+                    }
+                    else
+                    {
+                        sky = sky + "<span style=\"background-color: Gray;\">&nbsp;&nbsp;</span>";
+                    }
+                }
+                else
+                {
+                    if(satellites[curSatId]->posX == j && satellites[curSatId]->posY == i && ((isManualMode && manualSessionIsRunning) || !isManualMode))
+                    {
+                        sky = sky + "<span style=\"background-color: LightBlue; color: red;\"><b>" + "[]" + "</b></span>";
+                    }
+                    else
+                    {
+                        sky = sky + "<span style=\"background-color: LightBlue	;\">&nbsp;&nbsp;</span>";
+                    }
+                }
+            }
+            sky = sky + "</body></html>";
+        }
+        sky = sky + "    Wind - " + QString::number(wind) + "; Clouds - " + QString::number(cloud_count) + "/" + QString::number(rows*cols) + "<html><body></body></html>" + "Current satellite ID - ";
+        if((isManualMode && manualSessionIsRunning) || !isManualMode)
+        {
+            sky = sky + QString::number(satellites[curSatId]->id);
+        }
+        else
+        {
+            sky = sky + "**";
+        }
+        weatherWidget.updateText(sky);
     }
     else
     {
@@ -1467,22 +1642,35 @@ void DataManager::oneHzTimerElapsed()
     //закончили обновление погоды
 
 
-
-
-
-
-    if(sessions[globalCurrentSessionArrayPos].factSessionTimeEnd > QDateTime::currentDateTime() && sessions[globalCurrentSessionArrayPos].factSessionTimeStart <= QDateTime::currentDateTime() && new_matrix[sessions[globalCurrentSessionArrayPos].ka->posY][sessions[globalCurrentSessionArrayPos].ka->posX] == false && sessions[globalCurrentSessionArrayPos].cState == InProgress)
+    if(sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount < -1 && sessions[globalCurrentSessionArrayPos].factSessionTimeEnd > QDateTime::currentDateTime() && sessions[globalCurrentSessionArrayPos].factSessionTimeStart <= QDateTime::currentDateTime() && sessions[globalCurrentSessionArrayPos].cState == InProgress)
     {
-        sessions[globalCurrentSessionArrayPos].answers += getRandomInt(1, 10);
+        sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount = sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount + 10;
+    }
+
+
+
+
+    if(sessions[globalCurrentSessionArrayPos].factSessionTimeEnd > QDateTime::currentDateTime() && sessions[globalCurrentSessionArrayPos].factSessionTimeStart <= QDateTime::currentDateTime() && matrix[sessions[globalCurrentSessionArrayPos].ka->posY][sessions[globalCurrentSessionArrayPos].ka->posX] == false && sessions[globalCurrentSessionArrayPos].cState == InProgress)
+    {
+        if(!isManualMode)
+        {
+            sessions[globalCurrentSessionArrayPos].answers += getRandomInt(1, 10);
+        }
         currentKosState = 1; // ошибок нет, лазер стреляет
     }
     else
     {
-        if(currentKosState != 5)
-        {
-            if(sessions[globalCurrentSessionArrayPos].factSessionTimeEnd > QDateTime::currentDateTime() && new_matrix[sessions[globalCurrentSessionArrayPos].ka->posY][sessions[globalCurrentSessionArrayPos].ka->posX] == true && sessions[globalCurrentSessionArrayPos].cState == InProgress)
+
+            if(sessions[globalCurrentSessionArrayPos].factSessionTimeEnd > QDateTime::currentDateTime() && matrix[sessions[globalCurrentSessionArrayPos].ka->posY][sessions[globalCurrentSessionArrayPos].ka->posX] == true && sessions[globalCurrentSessionArrayPos].cState == InProgress)
             {
-                currentKosState = 6; // ошибок нет, лазер стреляет в облако
+                if(cloud_count >= 400)
+                {
+                    currentKosState = 5; //  идет дождь
+                }
+                else
+                {
+                    currentKosState = 6; // ошибок нет, лазер стреляет в облако
+                }
             }
             else
             {
@@ -1492,89 +1680,115 @@ void DataManager::oneHzTimerElapsed()
                 }
                 else
                 {
-                    if(QDateTime::currentDateTime() > sessions[globalCurrentSessionArrayPos + 1].factSessionTimeStart && new_matrix[sessions[globalCurrentSessionArrayPos + 1].ka->posY][sessions[globalCurrentSessionArrayPos + 1].ka->posX] == true)
+                    if(QDateTime::currentDateTime() > sessions[globalCurrentSessionArrayPos + 1].factSessionTimeStart && matrix[sessions[globalCurrentSessionArrayPos + 1].ka->posY][sessions[globalCurrentSessionArrayPos + 1].ka->posX] == true)
                     {
                         currentKosState = 2; // ошибок нет, облачно
                     }
                     else
                     {
-                        currentKosState = 3; // есть ошибки
+//                        currentKosState = 3; // есть ошибки
                     }
                 }
             }
-        }
+
     }
-    if(cloud_count < 400 && currentKosState == 5)
-    {
-        currentKosState = 3; // есть ошибки
-    }
+//    if(cloud_count < 400 && currentKosState == 5)
+//    {
+//        currentKosState = 3; // есть ошибки
+//    }
     cloud_count = 0;
     // если закончился текущий сеанс
-    if(sessions[globalCurrentSessionArrayPos].factSessionTimeEnd <= QDateTime::currentDateTime() || (sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount != -1 && sessions[globalCurrentSessionArrayPos].answers >= sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount * 180))
+    if(sessions[globalCurrentSessionArrayPos].factSessionTimeEnd <= QDateTime::currentDateTime() || sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount == 0 || (sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount != -1 && sessions[globalCurrentSessionArrayPos].answers >= sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount * 180))
     {
         // этот сеанс заканчиваем
         if(!(sessions[globalCurrentSessionArrayPos].cState == Done) && !(sessions[globalCurrentSessionArrayPos].cState == FailedUnknown) && !(sessions[globalCurrentSessionArrayPos].cState == FailedTech) && !(sessions[globalCurrentSessionArrayPos].cState == FailedWeather))
         {
-            if(sessions[globalCurrentSessionArrayPos].answers >= sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount * 180 || sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount == -1) //если ответов достаточно
+            if(sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount == 0 || sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount == -1)
             {
-                sessions[globalCurrentSessionArrayPos].cState = Done; //вероятнее всего, статус будет Выполнен
-                if(!getRandomInt(10)) //но кубик может решить иначе
-                {
-                    sessions[globalCurrentSessionArrayPos].cState = static_cast<CompletionState>(getRandomInt(3) + 3);
-                }
+                sessions[globalCurrentSessionArrayPos].cState = Done;
             }
-            else //если ответов недостаточно
+            else
             {
-                if(sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount != -1)
+                if(sessions[globalCurrentSessionArrayPos].answers >= sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount * 180) //если ответов достаточно
                 {
-                    if(currentKosState == 5 || new_matrix[sessions[globalCurrentSessionArrayPos].ka->posY][sessions[globalCurrentSessionArrayPos].ka->posX] == true)
+                    sessions[globalCurrentSessionArrayPos].cState = Done; //вероятнее всего, статус будет Выполнен
+                    if(!getRandomInt(10)) //но кубик может решить иначе
+                    {
+                        sessions[globalCurrentSessionArrayPos].cState = static_cast<CompletionState>(getRandomInt(3) + 3);
+                    }
+                }
+                else //если ответов недостаточно
+                {
+                    if(currentKosState == 5 || matrix[sessions[globalCurrentSessionArrayPos].ka->posY][sessions[globalCurrentSessionArrayPos].ka->posX] == true)
                     {
                         sessions[globalCurrentSessionArrayPos].cState = static_cast<CompletionState>(4);
                     }
                     else
                     {
                         sessions[globalCurrentSessionArrayPos].cState = static_cast<CompletionState>(getRandomInt(1) + 5);   //кубик решает, какой будет статус из "неудачных"
-                        currentKosState = 3;
+                        //                        currentKosState = 3;
                     }
+                }
+            }
+        }
+    }
+    // записываем новый статус сеанса в его окно
+    for (int i = 0; i < windows[sessions[globalCurrentSessionArrayPos].WindowId].second.sessions.length(); i++)
+    {
+        if(windows[sessions[globalCurrentSessionArrayPos].WindowId].second.sessions[i].second.first == sessions[globalCurrentSessionArrayPos].id)
+        {
+            windows[sessions[globalCurrentSessionArrayPos].WindowId].second.sessions[i].second.second = sessions[globalCurrentSessionArrayPos].cState;
+        }
+    }
+
+    //если следующий сеанс существует
+    if(globalCurrentSessionArrayPos + 1 <= sessions.length() - 1)
+    {
+        //если по времени следующий сеанс уже можно начать
+        if(QDateTime::currentDateTime() >= sessions[globalCurrentSessionArrayPos + 1].factSessionTimeStart)
+        {
+            //ищем следующий спутник в зоне видимости
+            int newGlobalCurrentSessionArrayPos = 0;
+            Session newCurrentSession;
+            bool init = false;
+            for(int i = 1; newGlobalCurrentSessionArrayPos == 0 && (globalCurrentSessionArrayPos + i <= sessions.length() - 1) && (sessions[globalCurrentSessionArrayPos + i].factSessionTimeStart <= QDateTime::currentDateTime()) && newGlobalCurrentSessionArrayPos == 0; i++)
+            {
+                if(sessions[globalCurrentSessionArrayPos + i].factSessionTimeEnd <= QDateTime::currentDateTime()) // если в запланированных сеансах попался тот, время которого истекло
+                {
+                    sessions[globalCurrentSessionArrayPos + i].cState = static_cast<CompletionState>(getRandomInt(1) + 5);   //кубик решает, какой будет статус из "неудачных"
                 }
                 else
                 {
-                    sessions[globalCurrentSessionArrayPos].cState = Done;
-                }
-            }
-        }
-        // записываем новый статус сеанса в его окно
-        for (int i = 0; i < windows[sessions[globalCurrentSessionArrayPos].WindowId].second.sessions.length(); i++)
-        {
-            if(windows[sessions[globalCurrentSessionArrayPos].WindowId].second.sessions[i].second.first == sessions[globalCurrentSessionArrayPos].id)
-            {
-                windows[sessions[globalCurrentSessionArrayPos].WindowId].second.sessions[i].second.second = sessions[globalCurrentSessionArrayPos].cState;
-            }
-        }
-
-        //если следующий сеанс существует
-        if(globalCurrentSessionArrayPos + 1 <= sessions.length() - 1)
-        {
-            //если по времени следующий сеанс уже можно начать
-            if(QDateTime::currentDateTime() >= sessions[globalCurrentSessionArrayPos + 1].factSessionTimeStart)
-            {
-                //ищем следующий спутник в зоне видимости
-                int newGlobalCurrentSessionArrayPos = 0;
-                Session newCurrentSession;
-                bool init = false;
-                for(int i = 1; newGlobalCurrentSessionArrayPos == 0 && (globalCurrentSessionArrayPos + i <= sessions.length() - 1) && (sessions[globalCurrentSessionArrayPos + i].factSessionTimeStart <= QDateTime::currentDateTime()) && newGlobalCurrentSessionArrayPos == 0; i++)
-                {
-                    if(sessions[globalCurrentSessionArrayPos + i].factSessionTimeEnd <= QDateTime::currentDateTime()) // если в запланированных сеансах попался тот, время которого истекло
+                    if((sessions[globalCurrentSessionArrayPos + i].cState == PlannedFixed || sessions[globalCurrentSessionArrayPos + i].cState == PlannedRange) && matrix[sessions[globalCurrentSessionArrayPos + i].ka->posY][sessions[globalCurrentSessionArrayPos + i].ka->posX] == false)
                     {
-                        sessions[globalCurrentSessionArrayPos + i].cState = static_cast<CompletionState>(getRandomInt(1) + 5);   //кубик решает, какой будет статус из "неудачных"
-                    }
-                    else
-                    {
-                        if((sessions[globalCurrentSessionArrayPos + i].cState == PlannedFixed || sessions[globalCurrentSessionArrayPos + i].cState == PlannedRange) && new_matrix[sessions[globalCurrentSessionArrayPos + i].ka->posY][sessions[globalCurrentSessionArrayPos + i].ka->posX] == false)
+                        switch (satellitePlanningSettings.find(sessions[globalCurrentSessionArrayPos + i].ka).value().priority)
                         {
-                            switch (satellitePlanningSettings.find(sessions[globalCurrentSessionArrayPos + i].ka).value().priority)
+                        case 3:
+                        {
+                            newGlobalCurrentSessionArrayPos = globalCurrentSessionArrayPos + i;
+                            Session tempNewSession = sessions[newGlobalCurrentSessionArrayPos];
+                            while(i > 1)
                             {
-                            case 3:
+                                sessions[globalCurrentSessionArrayPos + i] = sessions[globalCurrentSessionArrayPos + i - 1];
+                                i--;
+                            }
+                            sessions[globalCurrentSessionArrayPos + 1] = tempNewSession;
+                            break;
+                        }
+                        case 2:
+                        {
+                            if(init && satellitePlanningSettings.find(newCurrentSession.ka).value().priority < 2)
+                            {
+                                Session newCurrentSession = sessions[globalCurrentSessionArrayPos + i];
+                            }
+                            else
+                            {
+                                if(!init)
+                                {
+                                    Session newCurrentSession = sessions[globalCurrentSessionArrayPos + i];
+                                }
+                            }
+                            if(sessions[globalCurrentSessionArrayPos + i + 1].factSessionTimeStart >= QDateTime::currentDateTime())
                             {
                                 newGlobalCurrentSessionArrayPos = globalCurrentSessionArrayPos + i;
                                 Session tempNewSession = sessions[newGlobalCurrentSessionArrayPos];
@@ -1583,66 +1797,129 @@ void DataManager::oneHzTimerElapsed()
                                     sessions[globalCurrentSessionArrayPos + i] = sessions[globalCurrentSessionArrayPos + i - 1];
                                     i--;
                                 }
-                                sessions[globalCurrentSessionArrayPos + 1] = tempNewSession;
-                                break;
-                            }
-                            case 2:
-                            {
-                                if(init && satellitePlanningSettings.find(newCurrentSession.ka).value().priority < 2)
-                                {
-                                    Session newCurrentSession = sessions[globalCurrentSessionArrayPos + i];
-                                }
-                                else
-                                {
-                                    if(!init)
-                                    {
-                                        Session newCurrentSession = sessions[globalCurrentSessionArrayPos + i];
-                                    }
-                                }
-                                if(sessions[globalCurrentSessionArrayPos + i + 1].factSessionTimeStart >= QDateTime::currentDateTime())
-                                {
-                                    newGlobalCurrentSessionArrayPos = globalCurrentSessionArrayPos + i;
-                                    Session tempNewSession = sessions[newGlobalCurrentSessionArrayPos];
-                                    while(i > 1)
-                                    {
-                                        sessions[globalCurrentSessionArrayPos + i] = sessions[globalCurrentSessionArrayPos + i - 1];
-                                        i--;
-                                    }
-                                    sessions[globalCurrentSessionArrayPos + 1] = tempNewSession;                                     }
-                                break;
-                            }
-                            case 1:
-                            {
-                                if(!init)
-                                {
-                                    Session newCurrentSession = sessions[globalCurrentSessionArrayPos + i];
-                                }
-                                if(sessions[globalCurrentSessionArrayPos + i + 1].factSessionTimeStart >= QDateTime::currentDateTime())
-                                {
-                                    newGlobalCurrentSessionArrayPos = globalCurrentSessionArrayPos + i;
-                                    Session tempNewSession = sessions[newGlobalCurrentSessionArrayPos];
-                                    while(i > 1)
-                                    {
-                                        sessions[globalCurrentSessionArrayPos + i] = sessions[globalCurrentSessionArrayPos + i - 1];
-                                        i--;
-                                    }
-                                    sessions[globalCurrentSessionArrayPos + 1] = tempNewSession;                                     }
-                                break;
-                            }
-                            default:
-                                break;
-                            }
-
+                                sessions[globalCurrentSessionArrayPos + 1] = tempNewSession;                                     }
+                            break;
                         }
+                        case 1:
+                        {
+                            if(!init)
+                            {
+                                Session newCurrentSession = sessions[globalCurrentSessionArrayPos + i];
+                            }
+                            if(sessions[globalCurrentSessionArrayPos + i + 1].factSessionTimeStart >= QDateTime::currentDateTime())
+                            {
+                                newGlobalCurrentSessionArrayPos = globalCurrentSessionArrayPos + i;
+                                Session tempNewSession = sessions[newGlobalCurrentSessionArrayPos];
+                                while(i > 1)
+                                {
+                                    sessions[globalCurrentSessionArrayPos + i] = sessions[globalCurrentSessionArrayPos + i - 1];
+                                    i--;
+                                }
+                                sessions[globalCurrentSessionArrayPos + 1] = tempNewSession;                                     }
+                            break;
+                        }
+                        default:
+                            break;
+                        }
+
                     }
                 }
-                globalCurrentSessionArrayPos++;
-                // следущему присваиваем состояние в процессе
-                sessions[globalCurrentSessionArrayPos].cState = InProgress;
-                sessions[globalCurrentSessionArrayPos].answers = 0;
-                qDebug() << "Started new session " << sessions[globalCurrentSessionArrayPos].factSessionTimeStart.toString("hh:mm:ss");
-
             }
+            globalCurrentSessionArrayPos++;
+            // следущему присваиваем состояние в процессе
+            sessions[globalCurrentSessionArrayPos].cState = InProgress;
+            sessions[globalCurrentSessionArrayPos].answers = 0;
+
+            // возможно этот иф придется убрать
+            if(sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount < -1)
+            {
+                sessions[globalCurrentSessionArrayPos].factSessionTimeStart = QDateTime::currentDateTime();
+                sessions[globalCurrentSessionArrayPos].factSessionTimeEnd = sessions[globalCurrentSessionArrayPos].factSessionTimeStart.addSecs(sessions[globalCurrentSessionArrayPos].currentPlanningRule.pointsAmount / -10);
+            }
+
+
+
+            journal.append({QString::number(journal.length() + 1), QString::number(sessions[globalCurrentSessionArrayPos].factSessionTimeStart.toSecsSinceEpoch()), "Сообщение №" + QString::number(journal.length() + 1)});
+            int numberOfShift = 1;
+            if(sessions[globalCurrentSessionArrayPos].factSessionTimeStart.time() >= QTime(8, 0, 0, 0))
+            {
+                numberOfShift = 2;
+                if(sessions[globalCurrentSessionArrayPos].factSessionTimeStart.time() >= QTime(16, 0, 0, 0))
+                {
+                    numberOfShift = 3;
+                }
+            }
+            tests.append({QString::number(tests.length() + 1), QString::number(sessions[globalCurrentSessionArrayPos].factSessionTimeStart.toSecsSinceEpoch()), getRandomInt(4)?"В наличии":"Отсутствует", getRandomInt(4)?"В наличии":"Отсутствует",QString::number(numberOfShift)});
+            fnks.append({QString::number(fnks.length() + 1), QString::number(sessions[globalCurrentSessionArrayPos].factSessionTimeStart.toSecsSinceEpoch()), getRandomInt(4)?"Да":"Нет", getRandomInt(4)?"Да":"Нет", getRandomInt(4)?"Да":"Нет"});
+            if(!getRandomInt(1))
+            {
+                currentWindSpeed = currentWindSpeed + getRandomInt(-2,2);
+                if(currentWindSpeed > 25)
+                {
+                    currentWindSpeed = currentWindSpeed - 2;
+                }
+                if(currentWindSpeed < 0)
+                {
+                    currentWindSpeed = currentWindSpeed + 2;
+                }
+                if(!getRandomInt(2))
+                {
+                    if (currentWindSpeed > 12)
+                    {
+                        currentWindSpeed--;
+                    }
+                    if (currentWindSpeed < 4)
+                    {
+                        currentWindSpeed++;
+                    }
+                }
+            }
+            if(!getRandomInt(200))
+            {
+                switch(sessions[globalCurrentSessionArrayPos].factSessionTimeStart.date().month())
+                {
+                case 1:
+                    currentTemp = getRandomInt(-35, -10);
+                    break;
+                case 2:
+                    currentTemp = getRandomInt(-15, 10);
+                    break;
+                case 3:
+                    currentTemp = getRandomInt(-5, 15);
+                    break;
+                case 4:
+                    currentTemp = getRandomInt(-5, 20);
+                    break;
+                case 5:
+                    currentTemp = getRandomInt(5, 25);
+                    break;
+                case 6:
+                    currentTemp = getRandomInt(15, 30);
+                    break;
+                case 7:
+                    currentTemp = getRandomInt(20, 35);
+                    break;
+                case 8:
+                    currentTemp = getRandomInt(20, 35);
+                    break;
+                case 9:
+                    currentTemp = getRandomInt(15, 25);
+                    break;
+                case 10:
+                    currentTemp = getRandomInt(5, 20);
+                    break;
+                case 11:
+                    currentTemp = getRandomInt(-5, 10);
+                    break;
+                case 12:
+                    currentTemp = getRandomInt(-20, 0);
+                    break;
+                }
+            }
+            meteos.append({QString::number(meteos.length() + 1), QString::number(sessions[globalCurrentSessionArrayPos].factSessionTimeStart.toSecsSinceEpoch()), QString::number(currentTemp + getRandomInt(-3,3)), QString::number(currentWindSpeed) + " м/с"});
+
+            qDebug() << "Started new session " << sessions[globalCurrentSessionArrayPos].factSessionTimeStart.toString("hh:mm:ss");
+
         }
     }
 
@@ -1652,26 +1929,107 @@ void DataManager::oneHzTimerElapsed()
     //manual mode windows and weather
     foreach(auto satId, manualModeInfos.keys())
     {
-        if(manualModeInfos[satId]->visibility.end < curDt)
+        if(manualModeInfos[satId]->visibility.end <= curDt)
         {
-            if(getRandomInt(1))
-                manualModeInfos[satId]->visibility = TimeSpan(curDt,curDt.addSecs(getRandomInt(599) + 1));
-            else
-                manualModeInfos[satId]->visibility = TimeSpan(curDt.addSecs(getRandomInt(600)),curDt.addSecs(getRandomInt(599) + 1 + 600));
-            manualModeInfos[satId]->infoText = "";
-            manualModeInfos[satId]->sessionsThisWindow = 0;
+            for (int i = 0; i < windows.length(); i++)
+            {
+                if(windows[i].first == satId - 1 && windows[i].second.startEnd.start > manualModeInfos[satId]->visibility.end)
+                {
+                    manualModeInfos[satId]->visibility = TimeSpan(windows[i].second.startEnd.start, windows[i].second.startEnd.end);
+                    manualModeInfos[satId]->infoText = "";
+                    manualModeInfos[satId]->sessionsThisWindow = 0;
+                    i = windows.length();
+                }
+            }
         }
-
-        if(getRandomInt(50))
-            manualModeInfos[satId]->weatherVal = static_cast<Weather>(getRandomInt(1));
+        if(manualModeInfos[satId]->visibility.start <= curDt && manualModeInfos[satId]->visibility.end > curDt)
+        {
+            if(matrix[satellites[satId - 1]->posY][satellites[satId - 1]->posX] == true)
+            {
+                manualModeInfos[satId]->weatherVal = static_cast<Weather>(1);
+            }
+            else
+            {
+                manualModeInfos[satId]->weatherVal = static_cast<Weather>(0);
+            }
+        }
     }
 
     //manual session points
     if(manualSessionIsRunning)
     {
-        curManualSessionPoints += getRandomInt(20);
+        if(manualModeInfos[curManualSessionSatId]->weatherVal == 0)
+        {
+            curManualSessionPoints += getRandomInt(10);
+        }
         if(manualModeInfos.contains(curManualSessionSatId))
             manualModeInfos[curManualSessionSatId]->infoText = QString("Идут измерения: %1 точек").arg(curManualSessionPoints);
+    }
+    if(isManualMode)
+    {
+        switch (currentKosState)
+        {
+        case 1:
+            if(manualSessionIsRunning)
+            {
+                if(manualModeInfos[curManualSessionSatId]->weatherVal == 1)
+                {
+                    currentKosState = 6;
+                }
+            }
+            else
+            {
+                currentKosState = 4;
+            }
+            break;
+        case 2:
+            if(manualSessionIsRunning)
+            {
+                if(manualModeInfos[curManualSessionSatId]->weatherVal == 0)
+                {
+                    currentKosState = 1;
+                }
+                else
+                {
+                    currentKosState = 6;
+                }
+            }
+            else
+            {
+                currentKosState = 4;
+            }
+            break;
+        case 3:
+            break;
+        case 4:
+            if(manualSessionIsRunning)
+            {
+                if(manualModeInfos[curManualSessionSatId]->weatherVal == 0)
+                {
+                    currentKosState = 1;
+                }
+                else
+                {
+                    currentKosState = 6;
+                }
+            }
+            break;
+        case 5:
+            break;
+        case 6:
+            if(manualSessionIsRunning)
+            {
+                if(manualModeInfos[curManualSessionSatId]->weatherVal == 0)
+                {
+                    currentKosState = 1;
+                }
+            }
+            else
+            {
+                currentKosState = 4;
+            }
+            break;
+        }
     }
 }
 

@@ -76,6 +76,8 @@ private:
     int secsToUpdateWeather = 1;
     int currentSecsToUpdateWeather = 1;
     bool firstChangeRain = false;
+    int currentTemp = 0;
+    int currentWindSpeed = 0;
 };
 
 #endif // DATAMANAGER_H
