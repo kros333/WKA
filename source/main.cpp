@@ -6,7 +6,7 @@
 #define DEFAULT_PORT 55555
 #define DAYS_TO_LEFT 20
 #define DAYS_TO_RIGHT 5
-#define WEATHER_UPDATE_FREQ 5
+#define WEATHER_UPDATE_FREQ 1
 
 int main(int argc, char *argv[])
 {
@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
     parser.addOption(daysRightOption);
     //weather update freq
     QCommandLineOption weatherUOption(QStringList() << "w" << "weather",
-                                      "Sets TCP server port.", "weather", QString::number(WEATHER_UPDATE_FREQ));
+                                      "How often is the weather updated (secs)", "weather", QString::number(WEATHER_UPDATE_FREQ));
     parser.addOption(weatherUOption);
     parser.process(a);
 

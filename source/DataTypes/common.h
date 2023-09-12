@@ -101,5 +101,11 @@ struct ManualModeRecord
     int sessionsThisWindow = 0;
 };
 
+struct CurrentError
+{
+    int errorId;
+    int count;
+    bool isAppendInJournal;
+};
 
 #endif // COMMON_H

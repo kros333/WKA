@@ -51,6 +51,7 @@ private slots:
 private:
     QVector<Session> sessions;
     QVector<Session> userPlannedSessions;
+    QVector<Session> manualSessions;
     QVector<QPair<int /*satId*/, VisibilityWindowSummary>> windows;
     QVector<Satellite*> satellites;
     QMap<Satellite*, SatellitePlanningRule> satellitePlanningSettings;
@@ -78,6 +79,8 @@ private:
     bool firstChangeRain = false;
     int currentTemp = 0;
     int currentWindSpeed = 0;
+    CurrentError currentError;
+    int lastErrorId = 0;
 };
 
 #endif // DATAMANAGER_H

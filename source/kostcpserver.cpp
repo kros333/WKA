@@ -171,14 +171,13 @@ void KosTcpServer::sendSessionsTableRows(const QJsonObject &jObj, QTcpSocket* so
     SessionsTableFilterOptions filter;
     auto jFilter = jObj["filter"].toObject();
     if(!jFilter.isEmpty())
-    {
+    {        
         auto jSelectedSatelliteIds = jFilter["satIds"].toArray();
         if(!jSelectedSatelliteIds.isEmpty())
         {
             foreach(auto jVal, jSelectedSatelliteIds)
                 filter.selectedSatelliteIds.append(jVal.toInt());
         }
-
         auto jSessionTime = jFilter["time"].toObject();
         if(!jSessionTime.isEmpty())
         {
