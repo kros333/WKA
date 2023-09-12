@@ -6,7 +6,7 @@
 #define DEFAULT_PORT 55555
 #define DAYS_TO_LEFT 20
 #define DAYS_TO_RIGHT 5
-#define WEATHER_UPDATE_FREQ 1
+#define WEATHER_UPDATE_FREQ 5
 
 int main(int argc, char *argv[])
 {
